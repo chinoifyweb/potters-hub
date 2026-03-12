@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { signIn } from "next-auth/react";
 import { Church, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,8 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const {
     register,
@@ -48,14 +52,49 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
-    // TODO: Implement actual signup
-    console.log("Signup:", data);
-    setTimeout(() => setIsLoading(false), 1500);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          password: data.password,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError(result.error || "Failed to create account");
+        setIsLoading(false);
+        return;
+      }
+
+      // Auto-login after successful registration
+      const signInResult = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        // Registration succeeded but auto-login failed, redirect to login
+        router.push("/login?registered=true");
+      } else {
+        window.location.href = "/dashboard";
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignUp = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google sign up");
+    signIn("google", { callbackUrl: "/dashboard" });
   };
 
   return (
@@ -109,6 +148,12 @@ export default function SignupPage() {
             </span>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">

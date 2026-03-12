@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { signIn } from "next-auth/react";
 import { Church, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +27,12 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
   const {
     register,
@@ -39,14 +44,29 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    // TODO: Implement actual login
-    console.log("Login:", data);
-    setTimeout(() => setIsLoading(false), 1500);
+    setError("");
+
+    try {
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password");
+        setIsLoading(false);
+      } else {
+        window.location.href = callbackUrl;
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google sign in");
+    signIn("google", { callbackUrl });
   };
 
   return (
@@ -100,6 +120,12 @@ export default function LoginPage() {
             </span>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -168,5 +194,13 @@ export default function LoginPage() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
