@@ -146,7 +146,7 @@ export default function AdminLayout({
               <Link href="/admin" className="flex items-center gap-2">
                 <Church className="h-7 w-7 text-primary" />
                 <div>
-                  <span className="text-lg font-bold">Potter's Hub</span>
+                  <span className="text-lg font-bold">Potter&apos;s Hub</span>
                   <p className="text-[11px] text-muted-foreground">Admin Panel</p>
                 </div>
               </Link>
@@ -213,7 +213,7 @@ export default function AdminLayout({
                   <SheetHeader className="border-b p-4">
                     <SheetTitle className="flex items-center gap-2">
                       <Church className="h-6 w-6 text-primary" />
-                      Potter's Hub
+                      Potter&apos;s Hub
                     </SheetTitle>
                   </SheetHeader>
                   <ScrollArea className="h-[calc(100vh-80px)] py-4">
@@ -230,7 +230,7 @@ export default function AdminLayout({
                 className="flex items-center gap-2 md:hidden"
               >
                 <Church className="h-6 w-6 text-primary" />
-                <span className="font-bold">Potter's Hub</span>
+                <span className="font-bold">Potter&apos;s Hub</span>
               </Link>
             </div>
 

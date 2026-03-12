@@ -127,7 +127,7 @@ export default function DashboardLayout({
           </div>
           {!sidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold truncate">Potter's Hub</h2>
+              <h2 className="text-sm font-bold truncate">Potter&apos;s Hub</h2>
               <p className="text-[11px] text-muted-foreground truncate">Welcome home</p>
             </div>
           )}
@@ -196,7 +196,7 @@ export default function DashboardLayout({
                   <Church className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold">Potter's Hub</h2>
+                  <h2 className="text-sm font-bold">Potter&apos;s Hub</h2>
                   <p className="text-[11px] text-muted-foreground">Welcome home</p>
                 </div>
               </div>

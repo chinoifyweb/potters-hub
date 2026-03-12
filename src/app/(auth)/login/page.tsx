@@ -58,7 +58,7 @@ export default function LoginPage() {
         <div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription className="mt-1">
-            Sign in to Potter's Hub
+            Sign in to Potter&apos;s Hub
           </CardDescription>
         </div>
       </CardHeader>
