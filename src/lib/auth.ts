@@ -17,8 +17,8 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "placeholder",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "placeholder",
       profile(profile) {
         return {
           id: profile.sub,
@@ -38,37 +38,54 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required")
-        }
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            console.error("[AUTH] Missing email or password")
+            return null
+          }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
-        })
+          console.log("[AUTH] Attempting login for:", credentials.email.toLowerCase())
 
-        if (!user || !user.passwordHash) {
-          throw new Error("Invalid email or password")
-        }
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email.toLowerCase() },
+          })
 
-        if (!user.isActive) {
-          throw new Error("Account has been deactivated")
-        }
+          if (!user) {
+            console.error("[AUTH] User not found:", credentials.email.toLowerCase())
+            return null
+          }
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        )
+          if (!user.passwordHash) {
+            console.error("[AUTH] User has no password hash:", user.email)
+            return null
+          }
 
-        if (!isPasswordValid) {
-          throw new Error("Invalid email or password")
-        }
+          if (!user.isActive) {
+            console.error("[AUTH] User account deactivated:", user.email)
+            return null
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.fullName,
-          image: user.avatarUrl,
-          role: user.role,
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.passwordHash
+          )
+
+          console.log("[AUTH] Password valid:", isPasswordValid)
+
+          if (!isPasswordValid) {
+            return null
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.fullName,
+            image: user.avatarUrl,
+            role: user.role,
+          }
+        } catch (error) {
+          console.error("[AUTH] Error in authorize:", error)
+          return null
         }
       },
     }),
