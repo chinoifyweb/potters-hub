@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
-import prisma from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -24,11 +24,22 @@ export async function POST(req: NextRequest) {
 
     const { fullName, email, password, phone } = parsed.data
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    })
+    // Check if user exists using Supabase REST API
+    const { data: existingUsers, error: lookupError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email.toLowerCase())
+      .limit(1)
 
-    if (existingUser) {
+    if (lookupError) {
+      console.error("Registration lookup error:", lookupError)
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      )
+    }
+
+    if (existingUsers && existingUsers.length > 0) {
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 }
@@ -37,27 +48,31 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12)
 
-    const user = await prisma.user.create({
-      data: {
-        fullName,
+    // Create user using Supabase REST API
+    const { data: newUser, error: createError } = await supabase
+      .from("users")
+      .insert({
+        full_name: fullName,
         email: email.toLowerCase(),
-        passwordHash,
+        password_hash: passwordHash,
         phone: phone || null,
         role: "member",
-        isActive: true,
-        isVerified: false,
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        createdAt: true,
-      },
-    })
+        is_active: true,
+        is_verified: false,
+      })
+      .select("id, email, full_name, role, created_at")
+      .single()
+
+    if (createError) {
+      console.error("Registration create error:", createError)
+      return NextResponse.json(
+        { error: "Failed to create account" },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json(
-      { message: "Account created successfully", user },
+      { message: "Account created successfully", user: newUser },
       { status: 201 }
     )
   } catch (error) {

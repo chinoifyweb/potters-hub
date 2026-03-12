@@ -1,12 +1,12 @@
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import bcrypt from "bcryptjs"
-import prisma from "./db"
+import { supabase } from "./supabase"
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Remove PrismaAdapter to avoid DB connection issues
+  // Using JWT strategy with Supabase REST API for user lookups
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -44,30 +44,41 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
-          console.log("[AUTH] Attempting login for:", credentials.email.toLowerCase())
+          const email = credentials.email.toLowerCase()
+          console.log("[AUTH] Attempting login for:", email)
 
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email.toLowerCase() },
-          })
+          // Use Supabase REST API instead of Prisma (works over HTTPS from Vercel)
+          const { data: users, error } = await supabase
+            .from("users")
+            .select("id, email, password_hash, full_name, avatar_url, role, is_active")
+            .eq("email", email)
+            .limit(1)
 
-          if (!user) {
-            console.error("[AUTH] User not found:", credentials.email.toLowerCase())
+          if (error) {
+            console.error("[AUTH] Supabase query error:", error.message)
             return null
           }
 
-          if (!user.passwordHash) {
+          const user = users?.[0]
+
+          if (!user) {
+            console.error("[AUTH] User not found:", email)
+            return null
+          }
+
+          if (!user.password_hash) {
             console.error("[AUTH] User has no password hash:", user.email)
             return null
           }
 
-          if (!user.isActive) {
+          if (!user.is_active) {
             console.error("[AUTH] User account deactivated:", user.email)
             return null
           }
 
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
-            user.passwordHash
+            user.password_hash
           )
 
           console.log("[AUTH] Password valid:", isPasswordValid)
@@ -79,8 +90,8 @@ export const authOptions: NextAuthOptions = {
           return {
             id: user.id,
             email: user.email,
-            name: user.fullName,
-            image: user.avatarUrl,
+            name: user.full_name,
+            image: user.avatar_url,
             role: user.role,
           }
         } catch (error) {
@@ -114,22 +125,30 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       // For OAuth sign-ins, check if user exists and create if not
       if (account?.provider === "google") {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-        })
+        const { data: existingUsers } = await supabase
+          .from("users")
+          .select("id, is_active")
+          .eq("email", user.email!)
+          .limit(1)
+
+        const existingUser = existingUsers?.[0]
 
         if (!existingUser) {
-          await prisma.user.create({
-            data: {
+          const { error } = await supabase
+            .from("users")
+            .insert({
               email: user.email!,
-              fullName: user.name ?? "",
-              avatarUrl: user.image,
+              full_name: user.name ?? "",
+              avatar_url: user.image,
               role: "member",
-              isVerified: true,
-              isActive: true,
-            },
-          })
-        } else if (!existingUser.isActive) {
+              is_verified: true,
+              is_active: true,
+            })
+          if (error) {
+            console.error("[AUTH] Failed to create Google user:", error.message)
+            return false
+          }
+        } else if (!existingUser.is_active) {
           return false
         }
       }
