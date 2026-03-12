@@ -1,0 +1,754 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  member
+  pastor
+  admin
+}
+
+enum PostType {
+  general
+  prayer_request
+  testimony
+  announcement
+}
+
+enum DonationStatus {
+  pending
+  successful
+  failed
+  refunded
+}
+
+enum DonationInterval {
+  weekly
+  monthly
+  quarterly
+  annually
+}
+
+enum RecurringDonationStatus {
+  active
+  paused
+  cancelled
+}
+
+enum CampaignType {
+  sms
+  email
+  push
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sent
+  failed
+}
+
+enum StreamType {
+  rtmp
+  m3u8
+  youtube
+}
+
+enum RsvpStatus {
+  going
+  interested
+  not_going
+}
+
+enum GroupMemberRole {
+  member
+  leader
+}
+
+enum Testament {
+  old
+  new_testament
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?   @map("password_hash")
+  fullName      String    @map("full_name")
+  avatarUrl     String?   @map("avatar_url")
+  role          UserRole  @default(member)
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  country       String?
+  dateOfBirth   DateTime? @map("date_of_birth")
+  gender        String?
+  socialLinks   Json?     @map("social_links")
+  isVerified    Boolean   @default(false) @map("is_verified")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  donations         Donation[]
+  recurringDonations RecurringDonation[]
+  posts             Post[]
+  postComments      PostComment[]
+  postLikes         PostLike[]
+  notes             Note[]
+  bookmarks         BibleBookmark[]
+  eventRsvps        EventRsvp[]
+  groupMemberships  GroupMember[]
+  notifications     Notification[]
+  pushTokens        PushToken[]
+  sentMessages      Message[]         @relation("SentMessages")
+  conversations     ConversationParticipant[]
+  blogPosts         BlogPost[]
+  galleryPhotos     GalleryPhoto[]
+  campaigns         Campaign[]
+  memberListEntries MemberListEntry[]
+  createdEvents     Event[]
+  createdMemberLists MemberList[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token") @db.Text
+  accessToken       String? @map("access_token") @db.Text
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
+  scope             String?
+  idToken           String? @map("id_token") @db.Text
+  sessionState      String? @map("session_state")
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// CHURCH & BRANCHES
+// ============================================
+
+model ChurchProfile {
+  id              String   @id @default(uuid())
+  name            String
+  logoUrl         String?  @map("logo_url")
+  address         String?
+  phone           String?
+  email           String?
+  website         String?
+  socialLinks     Json?    @map("social_links")
+  about           String?  @db.Text
+  seniorPastorName String? @map("senior_pastor_name")
+  foundedYear     Int?     @map("founded_year")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  branches ChurchBranch[]
+
+  @@map("church_profiles")
+}
+
+model ChurchBranch {
+  id           String   @id @default(uuid())
+  churchId     String   @map("church_id")
+  name         String
+  address      String
+  city         String?
+  state        String?
+  country      String?
+  lat          Float?
+  lng          Float?
+  pastorName   String?  @map("pastor_name")
+  pastorEmail  String?  @map("pastor_email")
+  pastorPhone  String?  @map("pastor_phone")
+  serviceTimes Json?    @map("service_times")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  church ChurchProfile @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@map("church_branches")
+}
+
+// ============================================
+// SERMONS & MEDIA
+// ============================================
+
+model Sermon {
+  id                 String   @id @default(uuid())
+  title              String
+  slug               String   @unique
+  description        String?  @db.Text
+  speaker            String?
+  seriesName         String?  @map("series_name")
+  scriptureReference String?  @map("scripture_reference")
+  sermonDate         DateTime? @map("sermon_date")
+  videoUrl           String?  @map("video_url")
+  audioUrl           String?  @map("audio_url")
+  thumbnailUrl       String?  @map("thumbnail_url")
+  durationSeconds    Int?     @map("duration_seconds")
+  viewCount          Int      @default(0) @map("view_count")
+  isFeatured         Boolean  @default(false) @map("is_featured")
+  isPublished        Boolean  @default(false) @map("is_published")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  categories SermonCategoryMap[]
+  notes      Note[]
+
+  @@map("sermons")
+}
+
+model SermonCategory {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sermons SermonCategoryMap[]
+
+  @@map("sermon_categories")
+}
+
+model SermonCategoryMap {
+  sermonId   String @map("sermon_id")
+  categoryId String @map("category_id")
+
+  sermon   Sermon         @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  category SermonCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([sermonId, categoryId])
+  @@map("sermon_category_map")
+}
+
+model Livestream {
+  id           String     @id @default(uuid())
+  title        String
+  description  String?    @db.Text
+  streamUrl    String     @map("stream_url")
+  streamType   StreamType @map("stream_type")
+  thumbnailUrl String?    @map("thumbnail_url")
+  isLive       Boolean    @default(false) @map("is_live")
+  scheduledAt  DateTime?  @map("scheduled_at")
+  endedAt      DateTime?  @map("ended_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@map("livestreams")
+}
+
+model RadioChannel {
+  id           String  @id @default(uuid())
+  name         String
+  description  String?
+  streamUrl    String  @map("stream_url")
+  thumbnailUrl String? @map("thumbnail_url")
+  isActive     Boolean @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("radio_channels")
+}
+
+// ============================================
+// BIBLE
+// ============================================
+
+model BibleVersion {
+  id           String @id @default(uuid())
+  name         String
+  abbreviation String @unique
+
+  books BibleBook[]
+
+  @@map("bible_versions")
+}
+
+model BibleBook {
+  id         String    @id @default(uuid())
+  versionId  String    @map("version_id")
+  name       String
+  testament  Testament
+  bookNumber Int       @map("book_number")
+
+  version  BibleVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  chapters BibleChapter[]
+
+  @@unique([versionId, bookNumber])
+  @@map("bible_books")
+}
+
+model BibleChapter {
+  id            String @id @default(uuid())
+  bookId        String @map("book_id")
+  chapterNumber Int    @map("chapter_number")
+
+  book   BibleBook    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  verses BibleVerse[]
+
+  @@unique([bookId, chapterNumber])
+  @@map("bible_chapters")
+}
+
+model BibleVerse {
+  id          String @id @default(uuid())
+  chapterId   String @map("chapter_id")
+  verseNumber Int    @map("verse_number")
+  text        String @db.Text
+
+  chapter   BibleChapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  bookmarks BibleBookmark[]
+
+  @@unique([chapterId, verseNumber])
+  @@map("bible_verses")
+}
+
+model BibleBookmark {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  verseId   String   @map("verse_id")
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verse BibleVerse @relation(fields: [verseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, verseId])
+  @@map("bible_bookmarks")
+}
+
+// ============================================
+// EVENTS & GROUPS
+// ============================================
+
+model Event {
+  id             String    @id @default(uuid())
+  title          String
+  description    String?   @db.Text
+  location       String?
+  startDate      DateTime  @map("start_date")
+  endDate        DateTime? @map("end_date")
+  imageUrl       String?   @map("image_url")
+  isRecurring    Boolean   @default(false) @map("is_recurring")
+  recurrenceRule String?   @map("recurrence_rule")
+  rsvpCount      Int       @default(0) @map("rsvp_count")
+  createdById    String    @map("created_by_id")
+  isPublished    Boolean   @default(true) @map("is_published")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  createdBy User       @relation(fields: [createdById], references: [id])
+  rsvps     EventRsvp[]
+
+  @@map("events")
+}
+
+model EventRsvp {
+  id       String     @id @default(uuid())
+  eventId  String     @map("event_id")
+  userId   String     @map("user_id")
+  status   RsvpStatus @default(going)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_rsvps")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  category    String?
+  meetingDay  String?  @map("meeting_day")
+  meetingTime String?  @map("meeting_time")
+  location    String?
+  address     String?
+  lat         Float?
+  lng         Float?
+  leaderId    String?  @map("leader_id")
+  imageUrl    String?  @map("image_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members GroupMember[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String          @id @default(uuid())
+  groupId  String          @map("group_id")
+  userId   String          @map("user_id")
+  role     GroupMemberRole @default(member)
+  joinedAt DateTime        @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+// ============================================
+// GIVING & DONATIONS
+// ============================================
+
+model DonationCategory {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  donations         Donation[]
+  recurringDonations RecurringDonation[]
+
+  @@map("donation_categories")
+}
+
+model Donation {
+  id                    String         @id @default(uuid())
+  userId                String?        @map("user_id")
+  categoryId            String?        @map("category_id")
+  amount                Float
+  currency              String         @default("NGN")
+  paystackReference     String?        @map("paystack_reference")
+  paystackTransactionId String?        @map("paystack_transaction_id")
+  status                DonationStatus @default(pending)
+  donorName             String?        @map("donor_name")
+  donorEmail            String?        @map("donor_email")
+  isAnonymous           Boolean        @default(false) @map("is_anonymous")
+  note                  String?
+  createdAt             DateTime       @default(now()) @map("created_at")
+
+  user     User?             @relation(fields: [userId], references: [id])
+  category DonationCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("donations")
+}
+
+model RecurringDonation {
+  id                      String                  @id @default(uuid())
+  userId                  String                  @map("user_id")
+  categoryId              String?                 @map("category_id")
+  amount                  Float
+  currency                String                  @default("NGN")
+  interval                DonationInterval        @default(monthly)
+  paystackSubscriptionCode String?                @map("paystack_subscription_code")
+  status                  RecurringDonationStatus @default(active)
+  nextPaymentDate         DateTime?               @map("next_payment_date")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category DonationCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("recurring_donations")
+}
+
+// ============================================
+// SOCIAL & COMMUNITY
+// ============================================
+
+model Post {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  content       String   @db.Text
+  mediaUrls     Json?    @map("media_urls")
+  postType      PostType @default(general) @map("post_type")
+  likesCount    Int      @default(0) @map("likes_count")
+  commentsCount Int      @default(0) @map("comments_count")
+  isPinned      Boolean  @default(false) @map("is_pinned")
+  isVisible     Boolean  @default(true) @map("is_visible")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments PostComment[]
+  likes    PostLike[]
+
+  @@map("posts")
+}
+
+model PostComment {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("post_comments")
+}
+
+model PostLike {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  userId String @map("user_id")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+// ============================================
+// MESSAGING
+// ============================================
+
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String @id @default(uuid())
+  conversationId String @map("conversation_id")
+  userId         String @map("user_id")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  senderId       String   @map("sender_id")
+  content        String   @db.Text
+  mediaUrl       String?  @map("media_url")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+// ============================================
+// DEVOTIONALS & NOTES
+// ============================================
+
+model Devotional {
+  id          String    @id @default(uuid())
+  title       String
+  scripture   String?
+  content     String    @db.Text
+  author      String?
+  date        DateTime
+  imageUrl    String?   @map("image_url")
+  isPublished Boolean   @default(false) @map("is_published")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("devotionals")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String?
+  content   String   @db.Text
+  sermonId  String?  @map("sermon_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sermon Sermon? @relation(fields: [sermonId], references: [id])
+
+  @@map("notes")
+}
+
+// ============================================
+// NOTIFICATIONS & CAMPAIGNS
+// ============================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  body      String   @db.Text
+  type      String?
+  data      Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  title           String
+  message         String         @db.Text
+  type            CampaignType
+  recipientFilter Json?          @map("recipient_filter")
+  status          CampaignStatus @default(draft)
+  scheduledAt     DateTime?      @map("scheduled_at")
+  sentAt          DateTime?      @map("sent_at")
+  recipientCount  Int?           @map("recipient_count")
+  createdById     String         @map("created_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@map("campaigns")
+}
+
+model MemberList {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy User              @relation(fields: [createdById], references: [id])
+  entries   MemberListEntry[]
+
+  @@map("member_lists")
+}
+
+model MemberListEntry {
+  id     String @id @default(uuid())
+  listId String @map("list_id")
+  userId String @map("user_id")
+
+  list MemberList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, userId])
+  @@map("member_list_entries")
+}
+
+// ============================================
+// BLOG & GALLERY
+// ============================================
+
+model BlogPost {
+  id            String    @id @default(uuid())
+  title         String
+  slug          String    @unique
+  content       String    @db.Text
+  excerpt       String?
+  coverImageUrl String?   @map("cover_image_url")
+  authorId      String    @map("author_id")
+  isPublished   Boolean   @default(false) @map("is_published")
+  publishedAt   DateTime? @map("published_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("blog_posts")
+}
+
+model GalleryAlbum {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  coverImageUrl String?  @map("cover_image_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  photos GalleryPhoto[]
+
+  @@map("gallery_albums")
+}
+
+model GalleryPhoto {
+  id           String   @id @default(uuid())
+  albumId      String   @map("album_id")
+  imageUrl     String   @map("image_url")
+  caption      String?
+  uploadedById String   @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  album      GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  uploadedBy User         @relation(fields: [uploadedById], references: [id])
+
+  @@map("gallery_photos")
+}
+
+// ============================================
+// PLATFORM SETTINGS
+// ============================================
+
+model PlatformSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
