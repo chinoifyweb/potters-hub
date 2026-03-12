@@ -29,11 +29,14 @@ export async function GET() {
       nextauthUrl: process.env.NEXTAUTH_URL,
       hasSecret: !!process.env.NEXTAUTH_SECRET,
       hasDbUrl: !!process.env.DATABASE_URL,
+      dbUrlPrefix: process.env.DATABASE_URL?.substring(0, 60) + "...",
     })
   } catch (error: any) {
     return NextResponse.json({
       dbConnected: false,
       error: error.message,
+      dbUrlPrefix: process.env.DATABASE_URL?.substring(0, 60) + "...",
+      hasDbUrl: !!process.env.DATABASE_URL,
     }, { status: 500 })
   }
 }
