@@ -32,7 +32,8 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const isAdminSubdomain = typeof window !== "undefined" && window.location.hostname.startsWith("admin.");
+  const callbackUrl = searchParams.get("callbackUrl") || (isAdminSubdomain ? "/" : "/dashboard");
 
   const {
     register,
@@ -78,7 +79,7 @@ function LoginForm() {
         <div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription className="mt-1">
-            Sign in to Potter&apos;s Hub
+            {isAdminSubdomain ? "Admin Panel Sign In" : "Sign in to Potter\u0027s Hub"}
           </CardDescription>
         </div>
       </CardHeader>

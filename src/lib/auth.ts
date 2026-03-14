@@ -11,6 +11,19 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  cookies: {
+    sessionToken: {
+      name: "__Secure-next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        // Share cookie across all subdomains of tphc.org.ng
+        domain: process.env.NODE_ENV === "production" ? ".tphc.org.ng" : undefined,
+      },
+    },
+  },
   pages: {
     signIn: "/login",
     error: "/login",
