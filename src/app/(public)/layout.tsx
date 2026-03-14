@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Church,
   Menu,
   X,
   Phone,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ChurchLogoIcon } from "@/components/church-logo";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -37,9 +37,7 @@ function Navbar() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Church className="h-5 w-5 text-white" />
-          </div>
+          <ChurchLogoIcon size={36} />
           <span className="text-xl font-bold text-foreground">Potter&apos;s Hub</span>
         </Link>
 
@@ -130,9 +128,7 @@ function Footer() {
           {/* Church Info */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                <Church className="h-5 w-5 text-white" />
-              </div>
+              <ChurchLogoIcon size={36} />
               <span className="text-xl font-bold text-white">Potter&apos;s Hub</span>
             </div>
             <p className="text-sm leading-relaxed">

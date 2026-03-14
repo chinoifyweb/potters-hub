@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Red flame background -->
+  <path d="M50 5 C40 18 15 38 12 62 C9 82 25 98 50 100 C75 98 91 82 88 62 C85 38 60 18 50 5Z" fill="#C41E1E"/>
+  <!-- Left small flame -->
+  <path d="M30 18 C27 25 22 34 24 44 C26 50 32 52 33 45 C34 38 32 26 30 18Z" fill="#C41E1E"/>
+  <!-- Right small flame -->
+  <path d="M72 14 C74 22 77 30 75 39 C73 46 67 47 68 40 C69 33 71 22 72 14Z" fill="#C41E1E"/>
+  <!-- White vessel -->
+  <path d="M50 25 C42 34 28 48 26 65 C24 78 36 92 50 95 C64 92 76 78 74 65 C72 48 58 34 50 25Z" fill="white"/>
+  <!-- Vessel red accents -->
+  <path d="M40 52 C38 60 37 70 42 80 C45 87 48 90 50 92 C46 88 42 82 41 73 C40 65 41 57 40 52Z" fill="#C41E1E" opacity="0.6"/>
+  <path d="M60 52 C62 60 63 70 58 80 C55 87 52 90 50 92 C54 88 58 82 59 73 C60 65 59 57 60 52Z" fill="#C41E1E" opacity="0.6"/>
+  <!-- Cross -->
+  <line x1="50" y1="38" x2="50" y2="60" stroke="#1a3a7a" stroke-width="3" stroke-linecap="round"/>
+  <line x1="42" y1="46" x2="58" y2="46" stroke="#1a3a7a" stroke-width="3" stroke-linecap="round"/>
+</svg>

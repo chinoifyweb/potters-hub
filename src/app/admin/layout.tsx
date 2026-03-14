@@ -21,9 +21,9 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
-  Church,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ChurchLogoIcon } from "@/components/church-logo"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -144,7 +144,7 @@ export default function AdminLayout({
           >
             {!collapsed && (
               <Link href="/admin" className="flex items-center gap-2">
-                <Church className="h-7 w-7 text-primary" />
+                <ChurchLogoIcon size={28} />
                 <div>
                   <span className="text-lg font-bold">Potter&apos;s Hub</span>
                   <p className="text-[11px] text-muted-foreground">Admin Panel</p>
@@ -212,7 +212,7 @@ export default function AdminLayout({
                 <SheetContent side="left" className="w-[280px] p-0">
                   <SheetHeader className="border-b p-4">
                     <SheetTitle className="flex items-center gap-2">
-                      <Church className="h-6 w-6 text-primary" />
+                      <ChurchLogoIcon size={24} />
                       Potter&apos;s Hub
                     </SheetTitle>
                   </SheetHeader>
@@ -229,7 +229,7 @@ export default function AdminLayout({
                 href="/admin"
                 className="flex items-center gap-2 md:hidden"
               >
-                <Church className="h-6 w-6 text-primary" />
+                <ChurchLogoIcon size={24} />
                 <span className="font-bold">Potter&apos;s Hub</span>
               </Link>
             </div>

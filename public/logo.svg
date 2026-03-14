@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" fill="none">
+  <!-- Outer flames -->
+  <path d="M200 10 C160 60 60 140 50 250 C40 340 90 410 200 430 C310 410 360 340 350 250 C340 140 240 60 200 10Z" fill="#C41E1E"/>
+  <!-- Left small flame -->
+  <path d="M120 80 C110 100 95 130 100 170 C105 200 125 210 130 180 C135 150 130 110 120 80Z" fill="#C41E1E"/>
+  <!-- Right small flame -->
+  <path d="M280 60 C290 90 300 120 295 155 C290 180 270 185 272 160 C274 135 278 90 280 60Z" fill="#C41E1E"/>
+  <!-- Inner vessel shape (white) -->
+  <path d="M200 100 C170 130 120 180 115 250 C110 310 145 370 200 390 C255 370 290 310 285 250 C280 180 230 130 200 100Z" fill="white"/>
+  <!-- Vessel curves (red accents) -->
+  <path d="M160 200 C155 230 150 270 165 310 C175 340 190 360 200 370 C180 350 165 320 162 280 C160 250 163 220 160 200Z" fill="#C41E1E" opacity="0.7"/>
+  <path d="M240 200 C245 230 250 270 235 310 C225 340 210 360 200 370 C220 350 235 320 238 280 C240 250 237 220 240 200Z" fill="#C41E1E" opacity="0.7"/>
+  <!-- Vessel rim -->
+  <path d="M155 195 C165 185 185 180 200 180 C215 180 235 185 245 195 C240 200 220 205 200 205 C180 205 160 200 155 195Z" fill="#C41E1E" opacity="0.5"/>
+  <!-- Cross -->
+  <line x1="200" y1="150" x2="200" y2="230" stroke="#1a3a7a" stroke-width="8" stroke-linecap="round"/>
+  <line x1="175" y1="175" x2="225" y2="175" stroke="#1a3a7a" stroke-width="8" stroke-linecap="round"/>
+  <!-- TPHC text -->
+  <text x="200" y="290" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="52" fill="#1a3a7a">TPHC</text>
+  <!-- THE POTTER'S text -->
+  <text x="200" y="440" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="32" fill="#1a3a7a">THE POTTER'S</text>
+  <!-- HOUSE CHURCH badge -->
+  <rect x="105" y="450" width="190" height="30" rx="15" fill="#1a3a7a"/>
+  <text x="200" y="471" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="20" fill="white">HOUSE CHURCH</text>
+</svg>

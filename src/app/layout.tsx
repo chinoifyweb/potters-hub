@@ -8,6 +8,14 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Potter's Hub — The Potter's House Church",
   description: "Transforming Lives, Remolding Destinies. Connect with The Potter's House Church — sermons, events, giving, Bible, and more.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({

@@ -1,5 +1,4 @@
 import {
-  Church,
   Target,
   Eye,
   Clock,
@@ -7,6 +6,7 @@ import {
   Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChurchLogoIcon } from "@/components/church-logo";
 
 const leaders = [
   {
@@ -56,8 +56,8 @@ export default function AboutPage() {
       <section className="py-16">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center mb-10">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
-              <Church className="h-7 w-7 text-primary" />
+            <div className="mx-auto flex h-14 w-14 items-center justify-center mb-4">
+              <ChurchLogoIcon size={56} />
             </div>
             <h2 className="text-3xl font-bold">Our Story</h2>
           </div>

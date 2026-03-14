@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Church, ArrowLeft, Loader2, Mail } from "lucide-react";
+import { ArrowLeft, Loader2, Mail } from "lucide-react";
+import { ChurchLogoIcon } from "@/components/church-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,8 +92,8 @@ export default function ForgotPasswordPage() {
   return (
     <Card className="w-full shadow-lg border-0 shadow-blue-100/50">
       <CardHeader className="text-center space-y-3 pb-2">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-          <Church className="h-7 w-7 text-primary" />
+        <div className="mx-auto flex h-14 w-14 items-center justify-center">
+          <ChurchLogoIcon size={56} />
         </div>
         <div>
           <CardTitle className="text-2xl font-bold">Forgot Password?</CardTitle>

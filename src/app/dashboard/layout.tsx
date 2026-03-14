@@ -20,9 +20,9 @@ import {
   Menu,
   LogOut,
   ChevronLeft,
-  Church,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ChurchLogoIcon } from "@/components/church-logo"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -122,9 +122,7 @@ export default function DashboardLayout({
       >
         {/* Sidebar Header */}
         <div className={cn("flex items-center gap-3 p-4", sidebarCollapsed && "justify-center px-2")}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Church className="h-5 w-5" />
-          </div>
+          <ChurchLogoIcon size={36} />
           {!sidebarCollapsed && (
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold truncate">Potter&apos;s Hub</h2>
@@ -192,9 +190,7 @@ export default function DashboardLayout({
             <SheetContent side="left" className="w-[280px] p-0">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <div className="flex items-center gap-3 p-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Church className="h-5 w-5" />
-                </div>
+                <ChurchLogoIcon size={36} />
                 <div>
                   <h2 className="text-sm font-bold">Potter&apos;s Hub</h2>
                   <p className="text-[11px] text-muted-foreground">Welcome home</p>
