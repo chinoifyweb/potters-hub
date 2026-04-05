@@ -1,89 +1,113 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { z } from "zod"
-import { authOptions } from "@/lib/auth"
-import prisma from "@/lib/db"
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://geambxvkdmquotsprdgv.supabase.co",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlYW1ieHZrZG1xdW90c3ByZGd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDY0MDMsImV4cCI6MjA5MDQ4MjQwM30.xHklQJjnMbqD-Qlgyo9s6IdHu8xd3F5BREFybf_PG0Y"
+);
+
+// GET /api/devotionals — get today's devotional, by date, or list all
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "20")
-    const today = searchParams.get("today")
-    const skip = (page - 1) * limit
+    const { searchParams } = new URL(req.url);
+    const dateParam = searchParams.get("date");
+    const listParam = searchParams.get("list");
 
-    const where: any = { isPublished: true }
+    // List mode: return all devotionals (for calendar/archive)
+    if (listParam === "true") {
+      const { data, error } = await supabase
+        .from("devotionals")
+        .select("id, date, day_of_week, title, scripture")
+        .eq("is_published", true)
+        .order("date", { ascending: true });
 
-    if (today === "true") {
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date()
-      endOfDay.setHours(23, 59, 59, 999)
-      where.date = { gte: startOfDay, lte: endOfDay }
+      if (error) throw error;
+
+      const devotionals = (data || []).map((d: any) => ({
+        id: d.id,
+        date: typeof d.date === "string" ? d.date.split("T")[0] : d.date,
+        dayOfWeek: d.day_of_week,
+        topic: d.title,
+        scriptureRef: d.scripture,
+      }));
+
+      return NextResponse.json({ devotionals });
     }
 
-    const [devotionals, total] = await Promise.all([
-      prisma.devotional.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { date: "desc" },
-      }),
-      prisma.devotional.count({ where }),
-    ])
+    // Single devotional by date (or today)
+    const targetDate = dateParam || new Date().toISOString().split("T")[0];
+    const startOfDay = `${targetDate}T00:00:00.000Z`;
+    const endOfDay = `${targetDate}T23:59:59.999Z`;
+
+    const { data: devotional, error } = await supabase
+      .from("devotionals")
+      .select("*")
+      .gte("date", startOfDay)
+      .lte("date", endOfDay)
+      .eq("is_published", true)
+      .single();
+
+    if (error || !devotional) {
+      return NextResponse.json(
+        { error: "No devotional found for this date" },
+        { status: 404 }
+      );
+    }
+
+    // Get previous and next dates for navigation
+    const [prevResult, nextResult] = await Promise.all([
+      supabase
+        .from("devotionals")
+        .select("date, title")
+        .eq("is_published", true)
+        .lt("date", startOfDay)
+        .order("date", { ascending: false })
+        .limit(1)
+        .single(),
+      supabase
+        .from("devotionals")
+        .select("date, title")
+        .eq("is_published", true)
+        .gt("date", endOfDay)
+        .order("date", { ascending: true })
+        .limit(1)
+        .single(),
+    ]);
+
+    // Helper to extract YYYY-MM-DD from timestamptz
+    const toDateStr = (d: string) => typeof d === "string" ? d.split("T")[0] : d;
+
+    // Map to camelCase for frontend
+    const mapped = {
+      id: devotional.id,
+      date: toDateStr(devotional.date),
+      dayOfWeek: devotional.day_of_week,
+      topic: devotional.title,
+      scriptureRef: devotional.scripture,
+      scriptureText: devotional.scripture_text,
+      morningReading: devotional.morning_reading,
+      body: devotional.content,
+      prayerPoints: devotional.prayer_points,
+      isPublished: devotional.is_published,
+    };
 
     return NextResponse.json({
-      devotionals,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    })
-  } catch (error) {
-    console.error("Error fetching devotionals:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
-}
-
-const createDevotionalSchema = z.object({
-  title: z.string().min(1),
-  scripture: z.string().optional(),
-  content: z.string().min(1),
-  author: z.string().optional(),
-  date: z.string(),
-  imageUrl: z.string().url().optional().nullable(),
-  isPublished: z.boolean().optional(),
-})
-
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-    if (session.user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
-    const body = await req.json()
-    const parsed = createDevotionalSchema.safeParse(body)
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
-        { status: 400 }
-      )
-    }
-
-    const { date, ...data } = parsed.data
-
-    const devotional = await prisma.devotional.create({
-      data: {
-        ...data,
-        date: new Date(date),
+      devotional: mapped,
+      navigation: {
+        prev: prevResult.data
+          ? { date: toDateStr(prevResult.data.date), topic: prevResult.data.title }
+          : null,
+        next: nextResult.data
+          ? { date: toDateStr(nextResult.data.date), topic: nextResult.data.title }
+          : null,
       },
-    })
-
-    return NextResponse.json(devotional, { status: 201 })
+    });
   } catch (error) {
-    console.error("Error creating devotional:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Devotional API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch devotional" },
+      { status: 500 }
+    );
   }
 }

@@ -73,12 +73,14 @@ export async function middleware(request: NextRequest) {
   if (
     pathname === "/" ||
     pathname.startsWith("/sermons") ||
+    pathname.startsWith("/devotionals") ||
     pathname.startsWith("/events") ||
     pathname.startsWith("/give") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/about") ||
     pathname.startsWith("/contact") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/devotionals") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/debug") ||
     pathname.startsWith("/_next") ||

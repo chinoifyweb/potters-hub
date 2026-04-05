@@ -21,6 +21,7 @@ import { ChurchLogoIcon } from "@/components/church-logo";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/sermons", label: "Sermons" },
+  { href: "/devotionals", label: "Devotionals" },
   { href: "/events", label: "Events" },
   { href: "/give", label: "Give" },
   { href: "/blog", label: "Blog" },
