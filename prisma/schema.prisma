@@ -586,17 +586,22 @@ model Message {
 // ============================================
 
 model Devotional {
-  id          String    @id @default(uuid())
-  title       String
-  scripture   String?
-  content     String    @db.Text
-  author      String?
-  date        DateTime
-  imageUrl    String?   @map("image_url")
-  isPublished Boolean   @default(false) @map("is_published")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id             String    @id @default(uuid())
+  title          String
+  scripture      String?
+  scriptureText  String?   @map("scripture_text") @db.Text
+  content        String    @db.Text
+  author         String?
+  date           DateTime  @unique
+  dayOfWeek      String?   @map("day_of_week")
+  morningReading String?   @map("morning_reading")
+  prayerPoints   Json?     @map("prayer_points")
+  imageUrl       String?   @map("image_url")
+  isPublished    Boolean   @default(false) @map("is_published")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  @@index([date])
   @@map("devotionals")
 }
 

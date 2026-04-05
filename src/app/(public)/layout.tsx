@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Menu,
   X,
@@ -13,6 +14,7 @@ import {
   Twitter,
   Instagram,
   Youtube,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,8 @@ const navLinks = [
 function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: session } = useSession();
+  const isPastor = session?.user?.role === "pastor" || session?.user?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -58,16 +62,38 @@ function Navbar() {
               {link.label}
             </Link>
           ))}
+          {isPastor && (
+            <Link
+              href="/pastors"
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1",
+                pathname === "/pastors"
+                  ? "text-amber-700 bg-amber-50"
+                  : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+              )}
+            >
+              <Shield className="h-3.5 w-3.5" />
+              Pastor&apos;s Portal
+            </Link>
+          )}
         </nav>
 
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Log In</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/signup">Sign Up</Link>
-          </Button>
+          {session ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/login">Log In</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -102,17 +128,42 @@ function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {isPastor && (
+              <Link
+                href="/pastors"
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  "px-3 py-2.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2",
+                  pathname === "/pastors"
+                    ? "text-amber-700 bg-amber-50"
+                    : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Pastor&apos;s Portal
+              </Link>
+            )}
             <div className="pt-3 border-t mt-2 flex flex-col gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  Log In
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-                  Sign Up
-                </Link>
-              </Button>
+              {session ? (
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                    Dashboard
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" asChild>
+                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                      Log In
+                    </Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                      Sign Up
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
         </div>

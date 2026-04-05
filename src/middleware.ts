@@ -90,6 +90,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Pastor's Portal - requires pastor or admin role
+  if (pathname.startsWith("/pastors")) {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (token.role !== "pastor" && token.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Pastor messages API - requires pastor or admin role
+  if (pathname.startsWith("/api/pastor-messages")) {
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (token.role !== "pastor" && token.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
   // Auth pages - redirect to dashboard if already logged in
   if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
     if (token) {

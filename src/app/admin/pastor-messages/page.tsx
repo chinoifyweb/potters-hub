@@ -9,7 +9,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  BookOpen,
+  Shield,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,36 +41,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
-interface Devotional {
+interface PastorMessage {
   id: string;
   title: string;
-  scripture: string;
-  scriptureText: string;
+  speaker: string;
+  scriptureReference: string;
   content: string;
-  author: string;
+  notes: string;
+  audioUrl: string | null;
+  videoUrl: string | null;
+  category: string;
   date: string;
-  dayOfWeek: string;
-  morningReading: string;
-  prayerPoints: string[];
   isPublished: boolean;
 }
 
-const DAYS_OF_WEEK = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
+const categoryOptions = [
+  { value: "sermon", label: "Sermon" },
+  { value: "teaching", label: "Teaching" },
+  { value: "pastoral-care", label: "Pastoral Care" },
+  { value: "administration", label: "Administration" },
+  { value: "strategy", label: "Strategy" },
+  { value: "devotional", label: "Devotional" },
 ];
 
-export default function AdminDevotionalsPage() {
-  const [devotionals, setDevotionals] = useState<Devotional[]>([]);
+export default function AdminPastorMessagesPage() {
+  const [messages, setMessages] = useState<PastorMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -79,79 +86,67 @@ export default function AdminDevotionalsPage() {
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
+  const [formSpeaker, setFormSpeaker] = useState("");
   const [formScripture, setFormScripture] = useState("");
-  const [formScriptureText, setFormScriptureText] = useState("");
   const [formContent, setFormContent] = useState("");
-  const [formAuthor, setFormAuthor] = useState("");
+  const [formNotes, setFormNotes] = useState("");
+  const [formCategory, setFormCategory] = useState("sermon");
   const [formDate, setFormDate] = useState("");
-  const [formDayOfWeek, setFormDayOfWeek] = useState("");
-  const [formMorningReading, setFormMorningReading] = useState("");
-  const [formPrayerPoints, setFormPrayerPoints] = useState("");
-  const [formPublished, setFormPublished] = useState(true);
+  const [formAudioUrl, setFormAudioUrl] = useState("");
+  const [formVideoUrl, setFormVideoUrl] = useState("");
+  const [formPublished, setFormPublished] = useState(false);
 
-  const fetchDevotionals = async () => {
+  const fetchMessages = async () => {
     try {
-      const res = await fetch("/api/admin/devotionals");
+      const res = await fetch("/api/pastor-messages?all=true");
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setDevotionals(data.devotionals || []);
+      setMessages(data.messages || []);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load devotionals");
+      toast.error("Failed to load messages");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDevotionals();
+    fetchMessages();
   }, []);
 
   const resetForm = () => {
     setFormTitle("");
+    setFormSpeaker("");
     setFormScripture("");
-    setFormScriptureText("");
     setFormContent("");
-    setFormAuthor("");
+    setFormNotes("");
+    setFormCategory("sermon");
     setFormDate("");
-    setFormDayOfWeek("");
-    setFormMorningReading("");
-    setFormPrayerPoints("");
-    setFormPublished(true);
+    setFormAudioUrl("");
+    setFormVideoUrl("");
+    setFormPublished(false);
     setEditingId(null);
   };
 
   const openCreateDialog = () => {
     resetForm();
-    const today = new Date();
-    setFormDate(today.toISOString().split("T")[0]);
-    setFormDayOfWeek(DAYS_OF_WEEK[today.getDay()]);
+    setFormDate(new Date().toISOString().split("T")[0]);
     setDialogOpen(true);
   };
 
-  const openEditDialog = (d: Devotional) => {
-    setEditingId(d.id);
-    setFormTitle(d.title);
-    setFormScripture(d.scripture || "");
-    setFormScriptureText(d.scriptureText || "");
-    setFormContent(d.content || "");
-    setFormAuthor(d.author || "");
-    setFormDate(d.date);
-    setFormDayOfWeek(d.dayOfWeek || "");
-    setFormMorningReading(d.morningReading || "");
-    setFormPrayerPoints(
-      Array.isArray(d.prayerPoints) ? d.prayerPoints.join("\n") : ""
-    );
-    setFormPublished(d.isPublished);
+  const openEditDialog = (msg: PastorMessage) => {
+    setEditingId(msg.id);
+    setFormTitle(msg.title);
+    setFormSpeaker(msg.speaker || "");
+    setFormScripture(msg.scriptureReference || "");
+    setFormContent(msg.content || "");
+    setFormNotes(msg.notes || "");
+    setFormCategory(msg.category || "sermon");
+    setFormDate(msg.date);
+    setFormAudioUrl(msg.audioUrl || "");
+    setFormVideoUrl(msg.videoUrl || "");
+    setFormPublished(msg.isPublished);
     setDialogOpen(true);
-  };
-
-  const handleDateChange = (dateStr: string) => {
-    setFormDate(dateStr);
-    if (dateStr) {
-      const d = new Date(dateStr + "T00:00:00");
-      setFormDayOfWeek(DAYS_OF_WEEK[d.getDay()]);
-    }
   };
 
   const handleSave = async () => {
@@ -159,111 +154,103 @@ export default function AdminDevotionalsPage() {
       toast.error("Title is required");
       return;
     }
-    if (!formDate) {
-      toast.error("Date is required");
-      return;
-    }
-
     setSaving(true);
     try {
-      const prayerPointsArr = formPrayerPoints
-        .split("\n")
-        .map((p) => p.trim())
-        .filter(Boolean);
-
       const payload = {
         title: formTitle,
-        scripture: formScripture,
-        scriptureText: formScriptureText,
+        speaker: formSpeaker,
+        scriptureReference: formScripture,
         content: formContent,
-        author: formAuthor,
+        notes: formNotes,
+        category: formCategory,
         date: formDate,
-        dayOfWeek: formDayOfWeek,
-        morningReading: formMorningReading,
-        prayerPoints: prayerPointsArr,
+        audioUrl: formAudioUrl || null,
+        videoUrl: formVideoUrl || null,
         isPublished: formPublished,
       };
 
       let res: Response;
       if (editingId) {
-        res = await fetch(`/api/admin/devotionals/${editingId}`, {
+        res = await fetch(`/api/pastor-messages/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       } else {
-        res = await fetch("/api/admin/devotionals", {
+        res = await fetch("/api/pastor-messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       }
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to save");
-      }
+      if (!res.ok) throw new Error("Failed to save");
 
-      toast.success(editingId ? "Devotional updated" : "Devotional created");
+      toast.success(editingId ? "Message updated" : "Message created");
       setDialogOpen(false);
       resetForm();
-      fetchDevotionals();
-    } catch (err: any) {
+      fetchMessages();
+    } catch (err) {
       console.error(err);
-      toast.error(err.message || "Failed to save devotional");
+      toast.error("Failed to save message");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleTogglePublish = async (d: Devotional) => {
+  const handleTogglePublish = async (msg: PastorMessage) => {
     try {
-      const res = await fetch(`/api/admin/devotionals/${d.id}`, {
+      const res = await fetch(`/api/pastor-messages/${msg.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPublished: !d.isPublished }),
+        body: JSON.stringify({ isPublished: !msg.isPublished }),
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success(d.isPublished ? "Unpublished" : "Published");
-      fetchDevotionals();
+      toast.success(msg.isPublished ? "Unpublished" : "Published");
+      fetchMessages();
     } catch {
       toast.error("Failed to update");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this devotional?")) return;
+    if (!confirm("Are you sure you want to delete this message?")) return;
     try {
-      const res = await fetch(`/api/admin/devotionals/${id}`, {
+      const res = await fetch(`/api/pastor-messages/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Devotional deleted");
-      fetchDevotionals();
+      toast.success("Message deleted");
+      fetchMessages();
     } catch {
       toast.error("Failed to delete");
     }
   };
 
-  const filtered = devotionals.filter(
-    (d) =>
-      d.title.toLowerCase().includes(search.toLowerCase()) ||
-      d.scripture?.toLowerCase().includes(search.toLowerCase()) ||
-      d.author?.toLowerCase().includes(search.toLowerCase())
+  const filtered = messages.filter(
+    (m) =>
+      m.title.toLowerCase().includes(search.toLowerCase()) ||
+      m.speaker?.toLowerCase().includes(search.toLowerCase()) ||
+      m.scriptureReference?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Devotionals</h1>
+          <div className="flex items-center gap-2">
+            <Shield className="h-6 w-6 text-amber-500" />
+            <h1 className="text-3xl font-bold tracking-tight">
+              Pastor Messages
+            </h1>
+          </div>
           <p className="text-muted-foreground">
-            Manage daily devotional content
+            Manage sermons and resources for the Pastor&apos;s Portal
           </p>
         </div>
         <Button onClick={openCreateDialog}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Devotional
+          Add Message
         </Button>
       </div>
 
@@ -272,93 +259,104 @@ export default function AdminDevotionalsPage() {
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? "Edit Devotional" : "New Devotional"}
+              {editingId ? "Edit Message" : "New Pastor Message"}
             </DialogTitle>
             <DialogDescription>
               {editingId
-                ? "Update this devotional."
-                : "Create a new daily devotional."}
+                ? "Update this pastor-only message."
+                : "Create a new message for the Pastor's Portal."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label>Title *</Label>
               <Input
-                placeholder="Devotional title"
+                placeholder="Message title"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
+                <Label>Speaker</Label>
+                <Input
+                  placeholder="e.g., Pastor David"
+                  value={formSpeaker}
+                  onChange={(e) => setFormSpeaker(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label>Scripture Reference</Label>
                 <Input
-                  placeholder="e.g., Psalm 23:1-6"
+                  placeholder="e.g., John 10:11-18"
                   value={formScripture}
                   onChange={(e) => setFormScripture(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Author</Label>
-                <Input
-                  placeholder="e.g., Pastor David"
-                  value={formAuthor}
-                  onChange={(e) => setFormAuthor(e.target.value)}
-                />
-              </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Date *</Label>
+                <Label>Category</Label>
+                <Select
+                  value={formCategory}
+                  onValueChange={setFormCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoryOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Date</Label>
                 <Input
                   type="date"
                   value={formDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Day of Week</Label>
-                <Input
-                  value={formDayOfWeek}
-                  readOnly
-                  className="bg-muted"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Morning Reading</Label>
-                <Input
-                  placeholder="e.g., Psalm 119:1-16"
-                  value={formMorningReading}
-                  onChange={(e) => setFormMorningReading(e.target.value)}
+                  onChange={(e) => setFormDate(e.target.value)}
                 />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Scripture Text</Label>
+              <Label>Message Content</Label>
               <Textarea
-                placeholder="Full scripture passage text..."
-                rows={3}
-                value={formScriptureText}
-                onChange={(e) => setFormScriptureText(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Content</Label>
-              <Textarea
-                placeholder="Write the devotional content..."
-                rows={6}
+                placeholder="Write the message overview / sermon body..."
+                rows={5}
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
-              <Label>Prayer Points (one per line)</Label>
+              <Label>Sermon Notes / Outline</Label>
               <Textarea
-                placeholder={"Prayer point 1\nPrayer point 2\nPrayer point 3"}
-                rows={4}
-                value={formPrayerPoints}
-                onChange={(e) => setFormPrayerPoints(e.target.value)}
+                placeholder="Sermon outline, key points, application notes..."
+                rows={5}
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
               />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Audio URL (optional)</Label>
+                <Input
+                  placeholder="https://..."
+                  value={formAudioUrl}
+                  onChange={(e) => setFormAudioUrl(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Video URL (optional)</Label>
+                <Input
+                  placeholder="https://..."
+                  value={formVideoUrl}
+                  onChange={(e) => setFormVideoUrl(e.target.value)}
+                />
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Label>Publish immediately</Label>
@@ -386,13 +384,13 @@ export default function AdminDevotionalsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Devotionals Table */}
+      {/* Messages Table */}
       <Card>
         <CardHeader>
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by title, scripture, or author..."
+              placeholder="Search messages..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -406,52 +404,54 @@ export default function AdminDevotionalsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-40" />
-              <p>No devotionals found.</p>
+              <Shield className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p>No pastor messages found.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
-                  <TableHead>Scripture</TableHead>
                   <TableHead className="hidden md:table-cell">
-                    Author
+                    Speaker
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell">
+                    Category
                   </TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Published</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="w-[50px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((devotional) => (
-                  <TableRow key={devotional.id}>
+                {filtered.map((msg) => (
+                  <TableRow key={msg.id}>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium">
-                          {devotional.title}
-                        </span>
+                      <div>
+                        <span className="font-medium">{msg.title}</span>
+                        {msg.scriptureReference && (
+                          <p className="text-xs text-muted-foreground">
+                            {msg.scriptureReference}
+                          </p>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-normal">
-                        {devotional.scripture || "—"}
+                    <TableCell className="hidden md:table-cell">
+                      {msg.speaker || "—"}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <Badge variant="outline" className="capitalize">
+                        {msg.category}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {devotional.author || "—"}
-                    </TableCell>
                     <TableCell>
-                      {new Date(devotional.date).toLocaleDateString()}
+                      {new Date(msg.date).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={
-                          devotional.isPublished ? "default" : "secondary"
-                        }
+                        variant={msg.isPublished ? "default" : "secondary"}
                       >
-                        {devotional.isPublished ? "Published" : "Draft"}
+                        {msg.isPublished ? "Published" : "Draft"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -469,15 +469,15 @@ export default function AdminDevotionalsPage() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => openEditDialog(devotional)}
+                            onClick={() => openEditDialog(msg)}
                           >
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleTogglePublish(devotional)}
+                            onClick={() => handleTogglePublish(msg)}
                           >
-                            {devotional.isPublished ? (
+                            {msg.isPublished ? (
                               <>
                                 <EyeOff className="mr-2 h-4 w-4" />
                                 Unpublish
@@ -492,7 +492,7 @@ export default function AdminDevotionalsPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => handleDelete(devotional.id)}
+                            onClick={() => handleDelete(msg.id)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
