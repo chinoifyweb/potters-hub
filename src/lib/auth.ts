@@ -62,7 +62,7 @@ export const authOptions: NextAuthOptions = {
 
           // Use Supabase REST API instead of Prisma (works over HTTPS from Vercel)
           const { data: users, error } = await supabase
-            .from("users")
+            .from("church_users")
             .select("id, email, password_hash, full_name, avatar_url, role, is_active")
             .eq("email", email)
             .limit(1)
@@ -139,7 +139,7 @@ export const authOptions: NextAuthOptions = {
       // For OAuth sign-ins, check if user exists and create if not
       if (account?.provider === "google") {
         const { data: existingUsers } = await supabase
-          .from("users")
+          .from("church_users")
           .select("id, is_active")
           .eq("email", user.email!)
           .limit(1)
@@ -148,7 +148,7 @@ export const authOptions: NextAuthOptions = {
 
         if (!existingUser) {
           const { error } = await supabase
-            .from("users")
+            .from("church_users")
             .insert({
               email: user.email!,
               full_name: user.name ?? "",

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user exists using Supabase REST API
     const { data: existingUsers, error: lookupError } = await supabase
-      .from("users")
+      .from("church_users")
       .select("id")
       .eq("email", email.toLowerCase())
       .limit(1)
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     // Create user using Supabase REST API
     const { data: newUser, error: createError } = await supabase
-      .from("users")
+      .from("church_users")
       .insert({
         full_name: fullName,
         email: email.toLowerCase(),
