@@ -1,0 +1,19 @@
+{
+  "name": "potters-hub-outreach",
+  "version": "1.0.0",
+  "description": "WhatsApp + SMS outreach system for The Potter's Hub church admin panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "socket.io": "^4.7.5",
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode": "^1.5.3",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5"
+  }
+}
