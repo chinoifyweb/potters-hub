@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { supabase } from "@/lib/supabase"
+import { sendWelcomeEmail } from "@/lib/email"
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   phone: z.string().optional(),
+  role: z.enum(["member", "pastor"]).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
         email: email.toLowerCase(),
         password_hash: passwordHash,
         phone: phone || null,
-        role: "member",
+        role: parsed.data.role || "member",
         is_active: true,
         is_verified: false,
       })
@@ -70,6 +72,11 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Fire-and-forget welcome email — don't block response if email fails
+    void sendWelcomeEmail(email.toLowerCase(), fullName).catch((e) =>
+      console.error("[register] welcome email failed:", e)
+    )
 
     return NextResponse.json(
       { message: "Account created successfully", user: newUser },

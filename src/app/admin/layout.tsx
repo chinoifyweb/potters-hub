@@ -4,7 +4,7 @@ import React, { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  LayoutDashboard,
+  LayoutDashboard, UserPlus, Phone,
   Users,
   Video,
   Radio,
@@ -22,6 +22,11 @@ import {
   Menu,
   ChevronLeft,
   Shield,
+  Baby,
+  PartyPopper,
+  CalendarDays,
+  BookMarked,
+  HardHat,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChurchLogoIcon } from "@/components/church-logo"
@@ -54,8 +59,13 @@ import {
 const sidebarNavItems = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Members", href: "/admin/members", icon: Users },
+  { title: "Workers", href: "/admin/workers", icon: HardHat },
   { title: "Sermons", href: "/admin/sermons", icon: Video },
   { title: "Pastor Messages", href: "/admin/pastor-messages", icon: Shield },
+  { title: "Children Sermons", href: "/admin/children-sermons", icon: Baby },
+  { title: "Children Activities", href: "/admin/children-activities", icon: PartyPopper },
+  { title: "Calendar", href: "/admin/calendar", icon: CalendarDays },
+  { title: "Sunday Programs", href: "/admin/sunday-programs", icon: BookMarked },
   { title: "Livestream", href: "/admin/livestream", icon: Radio },
   { title: "Events", href: "/admin/events", icon: Calendar },
   { title: "Groups", href: "/admin/groups", icon: UsersRound },
@@ -64,8 +74,10 @@ const sidebarNavItems = [
   { title: "Blog", href: "/admin/blog", icon: FileText },
   { title: "Gallery", href: "/admin/gallery", icon: Image },
   { title: "Community", href: "/admin/community", icon: MessageSquare },
+  { title: "Visitors", href: "/admin/visitors", icon: UserPlus },
+  { title: "Outreach", href: "/admin/outreach", icon: Phone },
+  { title: "Care Groups", href: "/admin/care-groups", icon: UsersRound },
   { title: "Communications", href: "/admin/communications", icon: Send },
-  { title: "Outreach", href: "/admin/outreach", icon: Send },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ]
 

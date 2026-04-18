@@ -8,13 +8,35 @@ function normalizeNg(phone: string): string {
   return p;
 }
 
+const WA_URL = process.env.WA_SERVICE_URL || "http://127.0.0.1:3402/api";
+
 export async function waStatus() {
-  return {
-    ready: true,
-    mode: "click-to-send",
-    provider: "wa.me (click-to-send)",
-    note: "WhatsApp opens on the admin device pre-filled — tap Send to deliver.",
-  };
+  try {
+    const r = await fetch(`${WA_URL}/status`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("json")) {
+      return { ready: false, state: "OFFLINE", error: "WA service returned non-JSON" };
+    }
+    const data: any = await r.json();
+    // Server returns { whatsapp: { ready, qr, state, info }, sms, church, serverTime }
+    // Normalize to flat { ready, qr, state, info } for the client.
+    if (data && data.whatsapp) {
+      return {
+        ready: !!data.whatsapp.ready,
+        qr: data.whatsapp.qr || null,
+        state: data.whatsapp.state || "UNKNOWN",
+        info: data.whatsapp.info || null,
+        provider: "whatsapp-web.js",
+      };
+    }
+    // Fallback: already flat
+    return data;
+  } catch (e: any) {
+    return { ready: false, state: "OFFLINE", error: "WA service unreachable" };
+  }
 }
 
 const TERMII_KEY = process.env.TERMII_API_KEY || "";
@@ -33,8 +55,34 @@ export async function smsStatus() {
 
 export async function sendWhatsApp(phone: string, message: string, meta: any = {}) {
   const normalized = normalizeNg(phone);
-  const link = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
-  const status = "queued";
+  let status: string = "sent";
+  let error: string | null = null;
+  let fallbackLink: string | null = null;
+
+  try {
+    const r = await fetch(`${WA_URL}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: normalized,
+        name: meta.name,
+        type: meta.type,
+        message,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const data: any = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) {
+      status = "failed";
+      error = data.error || `WA service HTTP ${r.status}`;
+      fallbackLink = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+    }
+  } catch (e: any) {
+    status = "failed";
+    error = "WA service unreachable — not running or not ready";
+    fallbackLink = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+  }
+
   try {
     await prisma.messageLog.create({
       data: {
@@ -44,14 +92,17 @@ export async function sendWhatsApp(phone: string, message: string, meta: any = {
         templateType: meta.type || null,
         body: message,
         status,
-        error: null,
+        error,
         sentById: meta.sentById || null,
         visitorId: meta.visitorId || null,
         userId: meta.userId || null,
       },
     });
   } catch {}
-  return { ok: true, status: "queued", mode: "click-to-send", link, phone: normalized };
+
+  return status === "sent"
+    ? { ok: true, status: "sent", phone: normalized }
+    : { ok: false, error, link: fallbackLink, phone: normalized };
 }
 
 export async function sendSMS(phone: string, message: string, meta: any = {}) {

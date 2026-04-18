@@ -28,6 +28,7 @@ type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     register,
@@ -40,12 +41,23 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setIsLoading(true);
-    // TODO: Implement actual password reset
-    console.log("Reset password for:", data.email);
-    setTimeout(() => {
-      setIsLoading(false);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.email }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Something went wrong. Please try again.");
+      }
       setIsSubmitted(true);
-    }, 1500);
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -58,10 +70,11 @@ export default function ForgotPasswordPage() {
           <div>
             <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
             <CardDescription className="mt-2">
-              We&apos;ve sent a password reset link to{" "}
+              If an account exists for{" "}
               <span className="font-medium text-foreground">
                 {getValues("email")}
               </span>
+              , a password reset link has been sent. It is valid for 1 hour.
             </CardDescription>
           </div>
         </CardHeader>
@@ -117,6 +130,11 @@ export default function ForgotPasswordPage() {
               <p className="text-xs text-destructive">{errors.email.message}</p>
             )}
           </div>
+          {errorMsg && (
+            <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+              {errorMsg}
+            </p>
+          )}
           <Button type="submit" className="w-full h-11" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Send Reset Link

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/db"
+import { sendEmail } from "@/lib/email"
 
 export async function GET(req: NextRequest) {
   try {
@@ -91,7 +92,32 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // TODO: Integrate with actual email/SMS/push notification service
+    // Fire-and-forget email delivery for email campaigns (non-scheduled)
+    if (!scheduledAt && data.type === "email") {
+      ;(async () => {
+        try {
+          const recipients = await prisma.user.findMany({
+            where: { isActive: true },
+            select: { email: true, fullName: true },
+            take: 1000,
+          })
+          const subj = data.title
+          for (const r of recipients) {
+            if (!r.email) continue
+            const greeting = r.fullName ? `Dear ${r.fullName},` : "Dear Friend,"
+            const html = `<p>${greeting}</p><p>${data.message.replace(/\n/g, "<br>")}</p><p>&mdash; The Potter&apos;s Hub</p>`
+            try {
+              await sendEmail({ to: r.email, subject: subj, html })
+            } catch (err) {
+              console.error("Campaign send error for", r.email, err)
+            }
+          }
+        } catch (err) {
+          console.error("Campaign email batch error:", err)
+        }
+      })()
+    }
+    // TODO: Integrate SMS and push notification services (email is live)
 
     return NextResponse.json(campaign, { status: 201 })
   } catch (error) {

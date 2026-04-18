@@ -1,182 +1,195 @@
-const RESEND_API_KEY = process.env.RESEND_API_KEY!
-const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@yourdomain.com"
-const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Church App"
+/**
+ * Email sending via Purelymail SMTP
+ * Purelymail's HTTP API is mailbox-management only — outbound mail goes via SMTP.
+ *
+ * Required env vars:
+ *   SMTP_HOST        default: smtp.purelymail.com
+ *   SMTP_PORT        default: 465
+ *   SMTP_USER        full mailbox address, e.g. noreply@tphc.org.ng
+ *   SMTP_PASS        mailbox password (from Purelymail)
+ *   FROM_EMAIL       default: SMTP_USER
+ *   FROM_NAME        default: The Potter's Hub
+ *
+ * Also keeps PURELYMAIL_API_TOKEN for mailbox-management elsewhere.
+ */
 
-interface SendEmailOptions {
-  to: string | string[]
-  subject: string
-  html: string
-  from?: string
-  replyTo?: string
+import nodemailer, { type Transporter } from "nodemailer";
+
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.purelymail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const FROM_EMAIL = process.env.FROM_EMAIL || SMTP_USER || "noreply@tphc.org.ng";
+const FROM_NAME = process.env.FROM_NAME || "The Potter's Hub";
+
+let _transporter: Transporter | null = null;
+function getTransporter(): Transporter | null {
+  if (!SMTP_USER || !SMTP_PASS) return null;
+  if (_transporter) return _transporter;
+  _transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+  });
+  return _transporter;
 }
 
-interface ResendResponse {
-  id: string
+export interface SendEmailParams {
+  to: string | string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  from?: string;
+  replyTo?: string;
 }
 
-export async function sendEmail({
-  to,
-  subject,
-  html,
-  from,
-  replyTo,
-}: SendEmailOptions): Promise<{ success: boolean; id?: string; error?: string }> {
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Send an email via SMTP.
+ * Returns both `success` and `ok` for backwards compat with callers.
+ */
+export async function sendEmail(
+  params: SendEmailParams | { to: string; subject: string; html: string }
+): Promise<{ success: boolean; ok: boolean; messageId?: string; error?: string }> {
+  const p = params as SendEmailParams;
+  const toList = Array.isArray(p.to) ? p.to : [p.to];
+  const html = p.html || (p.text ? p.text.replace(/\n/g, "<br>") : "");
+  const text = p.text || (p.html ? stripHtml(p.html) : "");
+
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn(
+      "[Email] Skipped (no SMTP_USER/SMTP_PASS): \"" + p.subject + "\" -> " + toList.join(",")
+    );
+    return { success: false, ok: false, error: "SMTP not configured" };
+  }
+
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: from || `${APP_NAME} <${FROM_EMAIL}>`,
-        to: Array.isArray(to) ? to : [to],
-        subject,
-        html,
-        reply_to: replyTo,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      console.error("Resend API error:", error)
-      return { success: false, error: error.message || "Failed to send email" }
-    }
-
-    const data: ResendResponse = await response.json()
-    return { success: true, id: data.id }
-  } catch (error) {
-    console.error("Email send error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
+    const info = await transporter.sendMail({
+      from: p.from
+        ? p.from
+        : FROM_NAME
+        ? FROM_NAME + " <" + FROM_EMAIL + ">"
+        : FROM_EMAIL,
+      to: toList.join(", "),
+      subject: p.subject,
+      text,
+      html,
+      replyTo: p.replyTo,
+    });
+    console.log("[Email] Sent: \"" + p.subject + "\" -> " + toList.join(",") + " (" + info.messageId + ")");
+    return { success: true, ok: true, messageId: info.messageId };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[Email] SMTP send error:", msg);
+    return { success: false, ok: false, error: msg };
   }
 }
 
-// ---- Email template helpers ----
+// ============================================================================
+// Pre-baked templates
+// ============================================================================
 
-export function welcomeEmail(name: string) {
-  return {
-    subject: `Welcome to ${APP_NAME}!`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a2e;">Welcome to ${APP_NAME}, ${name}!</h1>
-        <p>We're excited to have you join our community. Here are some things you can do:</p>
-        <ul>
-          <li>Watch and listen to sermons</li>
-          <li>Join groups and connect with others</li>
-          <li>Stay updated with church events</li>
-          <li>Read daily devotionals</li>
-          <li>Give and support the church</li>
-        </ul>
-        <p>If you have any questions, feel free to reach out to us.</p>
-        <p>Blessings,<br/>The ${APP_NAME} Team</p>
-      </div>
-    `,
-  }
+const BRAND_FOOTER = `
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+  <p style="color:#6b7280;font-size:12px;line-height:1.5">
+    The Potter's Hub Church<br/>
+    <a href="https://tphc.org.ng" style="color:#2563eb">tphc.org.ng</a>
+  </p>
+`;
+
+function wrap(title: string, body: string) {
+  return `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;margin:0;padding:20px;color:#111827">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+      <h2 style="color:#1e3a8a;margin-top:0">${title}</h2>
+      ${body}
+      ${BRAND_FOOTER}
+    </div>
+  </body></html>`;
 }
 
-export function passwordResetEmail(name: string, resetUrl: string) {
-  return {
-    subject: `Reset your ${APP_NAME} password`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a2e;">Password Reset Request</h1>
-        <p>Hi ${name},</p>
-        <p>We received a request to reset your password. Click the button below to set a new password:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Reset Password
-          </a>
-        </div>
-        <p>This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.</p>
-        <p>Blessings,<br/>The ${APP_NAME} Team</p>
-      </div>
-    `,
-  }
+export async function sendWelcomeEmail(to: string, name: string) {
+  return sendEmail({
+    to,
+    subject: "Welcome to The Potter's Hub!",
+    html: wrap(
+      "Welcome, " + name + "!",
+      `<p>Praise the Lord! We're excited to have you join <strong>The Potter's Hub</strong> family.</p>
+       <p>Your account is ready. You can now access sermons, the Bible, prayer requests, devotionals, and more.</p>
+       <p style="margin-top:24px"><a href="https://tphc.org.ng/login" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">Sign In</a></p>
+       <p style="margin-top:24px">God bless you!<br/>&mdash; Pastor Arthur Ifeanyi</p>`
+    ),
+  });
 }
 
-export function verifyEmailTemplate(name: string, verifyUrl: string) {
-  return {
-    subject: `Verify your ${APP_NAME} email`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a2e;">Verify Your Email</h1>
-        <p>Hi ${name},</p>
-        <p>Please verify your email address by clicking the button below:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verifyUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-            Verify Email
-          </a>
-        </div>
-        <p>This link will expire in 24 hours.</p>
-        <p>Blessings,<br/>The ${APP_NAME} Team</p>
-      </div>
-    `,
-  }
+export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+  return sendEmail({
+    to,
+    subject: "Reset your Potter's Hub password",
+    html: wrap(
+      "Password Reset",
+      `<p>We received a request to reset your password. Click the button below (valid for 1 hour):</p>
+       <p style="margin:24px 0"><a href="${resetUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">Reset Password</a></p>
+       <p style="color:#6b7280;font-size:13px">Or copy this link: <br/><a href="${resetUrl}" style="color:#2563eb;word-break:break-all">${resetUrl}</a></p>
+       <p>If you did not request this, please ignore this email &mdash; your password will not change.</p>`
+    ),
+  });
 }
 
-export function donationReceiptEmail(
-  name: string,
-  amount: string,
-  category: string,
-  reference: string,
-  date: string
+export async function sendVerificationEmail(to: string, verifyUrl: string) {
+  return sendEmail({
+    to,
+    subject: "Verify your Potter's Hub email",
+    html: wrap(
+      "Verify your email",
+      `<p>Click the button below to verify your email and activate your account:</p>
+       <p style="margin:24px 0"><a href="${verifyUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">Verify Email</a></p>
+       <p style="color:#6b7280;font-size:13px">Or copy this link: <br/><a href="${verifyUrl}" style="color:#2563eb;word-break:break-all">${verifyUrl}</a></p>`
+    ),
+  });
+}
+
+export async function sendAdminNotification(
+  to: string | string[],
+  subject: string,
+  message: string
 ) {
-  return {
-    subject: `Donation Receipt - ${APP_NAME}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a2e;">Thank You for Your Donation!</h1>
-        <p>Hi ${name},</p>
-        <p>Your donation has been successfully processed. Here are the details:</p>
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-          <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Amount</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${amount}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Category</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${category}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Reference</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${reference}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Date</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${date}</td>
-          </tr>
-        </table>
-        <p>God bless you for your generosity.</p>
-        <p>Blessings,<br/>The ${APP_NAME} Team</p>
-      </div>
-    `,
-  }
+  return sendEmail({
+    to,
+    subject: "[TPHC Admin] " + subject,
+    html: wrap(subject, "<p>" + message + "</p>"),
+  });
 }
 
-export function eventReminderEmail(
-  name: string,
-  eventTitle: string,
-  eventDate: string,
-  eventLocation: string
+export async function sendDonationReceipt(
+  to: string,
+  opts: { name: string; amount: string; reference: string; purpose?: string }
 ) {
-  return {
-    subject: `Reminder: ${eventTitle} - ${APP_NAME}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a2e;">Event Reminder</h1>
-        <p>Hi ${name},</p>
-        <p>This is a reminder about an upcoming event you RSVP'd to:</p>
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h2 style="margin-top: 0;">${eventTitle}</h2>
-          <p><strong>Date:</strong> ${eventDate}</p>
-          <p><strong>Location:</strong> ${eventLocation}</p>
-        </div>
-        <p>We look forward to seeing you there!</p>
-        <p>Blessings,<br/>The ${APP_NAME} Team</p>
-      </div>
-    `,
-  }
+  return sendEmail({
+    to,
+    subject: "Thank you for your donation - The Potter's Hub",
+    html: wrap(
+      "Donation Receipt",
+      `<p>Dear ${opts.name},</p>
+       <p>Thank you for your generous donation to The Potter's Hub. God bless you!</p>
+       <table style="border-collapse:collapse;margin:16px 0">
+         <tr><td style="padding:6px 12px;color:#6b7280">Amount:</td><td style="padding:6px 12px;font-weight:600">${opts.amount}</td></tr>
+         ${opts.purpose ? `<tr><td style="padding:6px 12px;color:#6b7280">Purpose:</td><td style="padding:6px 12px">${opts.purpose}</td></tr>` : ""}
+         <tr><td style="padding:6px 12px;color:#6b7280">Reference:</td><td style="padding:6px 12px;font-family:monospace">${opts.reference}</td></tr>
+       </table>
+       <p>&ldquo;Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver.&rdquo; &mdash; 2 Corinthians 9:7</p>`
+    ),
+  });
 }

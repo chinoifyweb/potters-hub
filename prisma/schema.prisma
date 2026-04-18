@@ -123,6 +123,7 @@ model User {
   campaigns         Campaign[]
   memberListEntries MemberListEntry[]
   createdEvents     Event[]
+  passwordResetTokens PasswordResetToken[]
   createdMemberLists MemberList[]
 
   @@map("users")
@@ -462,6 +463,7 @@ model Donation {
   status                DonationStatus @default(pending)
   donorName             String?        @map("donor_name")
   donorEmail            String?        @map("donor_email")
+  donorPhone            String?        @map("donor_phone")
   isAnonymous           Boolean        @default(false) @map("is_anonymous")
   note                  String?
   createdAt             DateTime       @default(now()) @map("created_at")
@@ -596,6 +598,8 @@ model Devotional {
   dayOfWeek      String?   @map("day_of_week")
   morningReading String?   @map("morning_reading")
   prayerPoints   Json?     @map("prayer_points")
+  declaration    String?   @db.Text
+  bibleQuiz      Json?     @map("bible_quiz")
   imageUrl       String?   @map("image_url")
   isPublished    Boolean   @default(false) @map("is_published")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -756,4 +760,248 @@ model PlatformSetting {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+model PastorMessage {
+  id                  String    @id @default(uuid())
+  title               String
+  speaker             String?
+  scriptureReference  String?   @map("scripture_reference")
+  content             String?   @db.Text
+  notes               String?   @db.Text
+  audioUrl            String?   @map("audio_url")
+  videoUrl            String?   @map("video_url")
+  thumbnailUrl        String?   @map("thumbnail_url")
+  category            String    @default("sermon")
+  date                DateTime
+  durationSeconds     Int?      @map("duration_seconds")
+  isPublished         Boolean   @default(false) @map("is_published")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@map("pastor_messages")
+}
+
+model Visitor {
+  id              String    @id @default(uuid())
+  fullName        String    @map("full_name")
+  phone           String?
+  email           String?
+  firstVisitDate  DateTime  @default(now()) @map("first_visit_date")
+  howHeard        String?   @map("how_heard")
+  prayerRequest   String?   @map("prayer_request") @db.Text
+  wantsContact    Boolean   @default(true) @map("wants_contact")
+  status          String    @default("new")
+  assignedToId    String?   @map("assigned_to_id")
+  notes           String?   @db.Text
+  returnVisits    Int       @default(0) @map("return_visits")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  followUps       FollowUp[]
+  @@index([status])
+  @@index([firstVisitDate])
+  @@map("visitors")
+}
+
+model Worker {
+  id         String   @id @default(uuid())
+  fullName   String   @map("full_name")
+  phone      String
+  email      String?
+  department String?
+  role       String?
+  joinedAt   DateTime @default(now()) @map("joined_at")
+  isActive   Boolean  @default(true) @map("is_active")
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([phone])
+  @@index([department])
+  @@map("workers")
+}
+
+
+model FollowUp {
+  id            String    @id @default(uuid())
+  visitorId     String?   @map("visitor_id")
+  userId        String?   @map("user_id")
+  scheduledFor  DateTime  @map("scheduled_for")
+  type          String
+  status        String    @default("pending")
+  notes         String?   @db.Text
+  doneById      String?   @map("done_by_id")
+  doneAt        DateTime? @map("done_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  visitor       Visitor?  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  @@index([status, scheduledFor])
+  @@map("follow_ups")
+}
+
+model CareGroup {
+  id         String             @id @default(uuid())
+  name       String
+  leaderId   String?            @map("leader_id")
+  description String?           @db.Text
+  createdAt  DateTime           @default(now()) @map("created_at")
+  members    CareGroupMember[]
+  @@map("care_groups")
+}
+
+model CareGroupMember {
+  id        String    @id @default(uuid())
+  groupId   String    @map("group_id")
+  userId    String    @map("user_id")
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  group     CareGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  @@unique([groupId, userId])
+  @@map("care_group_members")
+}
+
+model AttendanceRecord {
+  id        String    @id @default(uuid())
+  userId    String?   @map("user_id")
+  visitorId String?   @map("visitor_id")
+  serviceDate DateTime @map("service_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+  @@unique([userId, serviceDate])
+  @@index([serviceDate])
+  @@map("attendance_records")
+}
+
+model MessageTemplate {
+  id        String    @id @default(uuid())
+  name      String
+  type      String
+  channel   String
+  body      String    @db.Text
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  @@map("message_templates")
+}
+
+model MessageLog {
+  id           String    @id @default(uuid())
+  channel      String
+  recipient    String
+  recipientName String?  @map("recipient_name")
+  templateType String?   @map("template_type")
+  body         String    @db.Text
+  status       String
+  error        String?   @db.Text
+  sentById     String?   @map("sent_by_id")
+  visitorId    String?   @map("visitor_id")
+  userId       String?   @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  @@index([createdAt])
+  @@index([status])
+  @@map("message_logs")
+}
+
+model ChildrenSermon {
+  id          String   @id @default(uuid())
+  title       String
+  teacher     String?
+  ageGroup    String?  @map("age_group")
+  description String?  @db.Text
+  videoUrl    String?  @map("video_url")
+  audioUrl    String?  @map("audio_url")
+  thumbnailUrl String? @map("thumbnail_url")
+  scripture   String?
+  memoryVerse  String?  @map("memory_verse")
+  weekNumber   Int?     @map("week_number")
+  quarter      String?
+  content      String?  @db.Text
+  date        DateTime
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@index([date])
+  @@map("children_sermons")
+}
+
+model ChildrenActivity {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  ageGroup    String?  @map("age_group")
+  imageUrl    String?  @map("image_url")
+  date        DateTime?
+  location    String?
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@map("children_activities")
+}
+
+model ChurchCalendarEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  date        DateTime
+  endDate     DateTime? @map("end_date")
+  category    String   @default("general")
+  isRecurring Boolean  @default(false) @map("is_recurring")
+  recurrence  String?
+  reminderDaysBefore Int @default(1) @map("reminder_days_before")
+  notifyAll   Boolean  @default(false) @map("notify_all")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@index([date])
+  @@map("church_calendar_events")
+}
+
+model SundayProgram {
+  id          String   @id @default(uuid())
+  serviceDate DateTime @map("service_date")
+  theme       String?
+  preacher    String?
+  scripture   String?
+  memoryVerse  String?  @map("memory_verse")
+  weekNumber   Int?     @map("week_number")
+  quarter      String?
+  content      String?  @db.Text
+  songs       Json?
+  announcements String? @db.Text
+  notes       String?  @db.Text
+  reminderSent Boolean @default(false) @map("reminder_sent")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@index([serviceDate])
+  @@map("sunday_programs")
+}
+
+model WorkersMeeting {
+  id          String   @id @default(uuid())
+  title       String
+  weekNumber  Int      @map("week_number")
+  quarter     String?
+  scripture   String?
+  content     String?  @db.Text
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([weekNumber])
+  @@map("workers_meetings")
+}
+
+// ============================================
+// AUTH: PASSWORD RESET
+// ============================================
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

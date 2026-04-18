@@ -122,3 +122,27 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if ((session.user as any).role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const b = await req.json().catch(() => ({}));
+  if (!b.fullName || !b.email) {
+    return NextResponse.json({ error: "fullName and email required" }, { status: 400 });
+  }
+  const exists = await prisma.user.findUnique({ where: { email: b.email } });
+  if (exists) return NextResponse.json({ error: "A user with that email already exists" }, { status: 409 });
+  const user = await prisma.user.create({
+    data: {
+      fullName: b.fullName,
+      email: b.email,
+      phone: b.phone || null,
+      role: b.role || "member",
+      isActive: true,
+      isVerified: false,
+    },
+    select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, isVerified: true, createdAt: true },
+  });
+  return NextResponse.json({ user }, { status: 201 });
+}

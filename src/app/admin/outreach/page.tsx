@@ -67,13 +67,25 @@ export default function OutreachPage() {
       const data = await r.json();
       const results = data.results || [];
 
-      // Open WhatsApp click-to-send links, spaced 600ms apart to avoid popup blocking
-      const waLinks = results.filter((x: any) => x.channel === "whatsapp" && x.link);
-      waLinks.forEach((x: any, i: number) => {
+      // WhatsApp results summary
+      const wa = results.filter((x: any) => x.channel === "whatsapp");
+      const waOk = wa.filter((x: any) => x.ok).length;
+      const waFail = wa.length - waOk;
+
+      // Open wa.me fallback links for any failed WA sends (e.g. service offline / not ready)
+      const fallbackLinks = wa.filter((x: any) => !x.ok && x.link);
+      fallbackLinks.forEach((x: any, i: number) => {
         setTimeout(() => window.open(x.link, "_blank", "noopener"), i * 600);
       });
-      if (waLinks.length > 0) {
-        toast.success(`WhatsApp: ${waLinks.length} chat(s) opened — tap Send in each.`);
+
+      if (wa.length > 0) {
+        if (waFail === 0) {
+          toast.success(`WhatsApp: ${waOk} sent automatically`);
+        } else if (waOk === 0 && fallbackLinks.length > 0) {
+          toast.error(`WhatsApp service unavailable — opened ${fallbackLinks.length} wa.me fallback link(s)`);
+        } else {
+          toast.error(`WhatsApp: ${waOk} sent, ${waFail} failed${fallbackLinks.length ? ` — ${fallbackLinks.length} wa.me link(s) opened` : ""}`);
+        }
       }
 
       // SMS result summary
@@ -85,7 +97,7 @@ export default function OutreachPage() {
         else toast.success(`SMS: ${smsOk} sent, ${smsFail} failed`);
       }
 
-      if (waLinks.length === 0 && sms.length === 0) {
+      if (wa.length === 0 && sms.length === 0) {
         toast.success("Request completed");
       }
 
@@ -102,14 +114,48 @@ export default function OutreachPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between"><h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-5 w-5" />WhatsApp</h3>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-5 w-5" />WhatsApp</h3>
             <Button variant="ghost" size="sm" onClick={loadStatus}><RefreshCw className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent>
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Click-to-send</Badge>
-            <p className="text-sm text-muted-foreground mt-2">
-              Tap Send — WhatsApp opens on your device pre-filled. Tap Send in WhatsApp to deliver.
-            </p>
+            {waStatus.ready ? (
+              <Badge className="bg-green-100 text-green-800 border-green-200">Connected</Badge>
+            ) : waStatus.state === "QR_READY" ? (
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200">Scan QR</Badge>
+            ) : waStatus.state === "INITIALIZING" || waStatus.state === "AUTHENTICATED" ? (
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200">Connecting…</Badge>
+            ) : (
+              <Badge className="bg-red-100 text-red-800 border-red-200">Offline</Badge>
+            )}
+
+            {waStatus.qr && !waStatus.ready && (
+              <div className="mt-3 p-4 bg-muted rounded-md text-center">
+                <p className="text-sm font-medium mb-2">📱 Scan with your WhatsApp phone:</p>
+                <img src={waStatus.qr} alt="WhatsApp QR" className="mx-auto max-w-[240px] rounded bg-white p-2" />
+                <p className="text-xs text-muted-foreground mt-2">
+                  WhatsApp → Settings → Linked Devices → Link a Device
+                </p>
+              </div>
+            )}
+
+            {waStatus.ready && waStatus.info?.pushname && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Connected as <strong>{waStatus.info.pushname}</strong>
+              </p>
+            )}
+
+            {!waStatus.ready && !waStatus.qr && waStatus.state !== "QR_READY" && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {waStatus.error || "Waiting for WhatsApp service to start… If this persists, check the tphc-wa PM2 process."}
+              </p>
+            )}
+
+            {waStatus.ready && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Messages will send automatically via WhatsApp Web.
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
