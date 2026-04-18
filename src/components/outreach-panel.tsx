@@ -1,16 +1,20 @@
+"use client";
+
 // ============================================================
 // THE POTTER'S HUB — WhatsApp + SMS Outreach Panel
 // Drop into any React admin app. No required props.
 // ============================================================
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 interface Member { id: number; name: string; phone: string; }
 interface LogEntry { time: string; channel?: string; status: string; to?: string; name?: string; error?: string; type?: string; }
-interface WaStatus { ready: boolean; state: string; qr?: string | null; info?: { pushname?: string; wid?: string } | null; }
-interface SmsStat { available: boolean; gatewayUrl?: string; lastChecked?: string; }
+interface WaStatus { ready: boolean; state: string; mode?: string; }
+interface SmsStat { available: boolean; provider?: string; sender?: string; lastChecked?: string; }
+interface TemplateOption { value: string; label: string; group: string; icon: string; }
+interface WaQueueItem { name: string; phone: string; link: string; text: string; }
 
-const API_BASE = "http://localhost:3001/api";
+const API_BASE = "/api/outreach";
 
 const COLORS = {
   green: "#1a4731",
@@ -28,26 +32,20 @@ const COLORS = {
   danger: "#c14040",
 };
 
-const MESSAGE_TYPES = [
-  { value: "welcome", label: "Welcome New Member" },
-  { value: "absence", label: "Missed You at Church" },
-  { value: "birthday", label: "Happy Birthday" },
-  { value: "broadcast", label: "General Announcement" },
-  { value: "custom", label: "Custom Message" },
-];
-
 const STORAGE_KEY = "potters_hub_outreach_members";
 
 export default function WhatsAppPanel() {
   const [waStatus, setWaStatus] = useState<WaStatus>({
-    ready: false,
-    state: "CONNECTING",
-    qr: null,
+    ready: true,
+    state: "CLICK_TO_SEND",
+    mode: "wa.me",
   });
   const [smsStatus, setSmsStatus] = useState<SmsStat>({
     available: false,
-    gatewayUrl: "",
+    provider: "Not configured",
+    sender: "PottersHub",
   });
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [type, setType] = useState("welcome");
   const [customMessage, setCustomMessage] = useState("");
   const [previewName, setPreviewName] = useState("Beloved");
@@ -59,6 +57,8 @@ export default function WhatsAppPanel() {
   const [singleName, setSingleName] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [waQueue, setWaQueue] = useState<WaQueueItem[]>([]);
+  const [opened, setOpened] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   // -------------- Load members from localStorage --------------
@@ -83,11 +83,11 @@ export default function WhatsAppPanel() {
         const res = await fetch(`${API_BASE}/status`);
         const data = await res.json();
         if (cancelled) return;
-        setWaStatus(data.whatsapp || {});
-        setSmsStatus(data.sms || {});
+        if (data.whatsapp) setWaStatus(data.whatsapp);
+        if (data.sms) setSmsStatus(data.sms);
+        if (Array.isArray(data.templates)) setTemplates(data.templates);
       } catch (err) {
         if (cancelled) return;
-        setWaStatus((s) => ({ ...s, state: "OFFLINE", ready: false }));
         setSmsStatus((s) => ({ ...s, available: false }));
       }
     }
@@ -140,6 +140,17 @@ export default function WhatsAppPanel() {
       clearInterval(id);
     };
   }, []);
+
+  // -------------- Group templates by group --------------
+  const groupedTemplates = useMemo(() => {
+    const groups: Record<string, TemplateOption[]> = {};
+    for (const t of templates) {
+      const key = t.group || "General";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(t);
+    }
+    return groups;
+  }, [templates]);
 
   // -------------- Member management --------------
   function addMember() {
@@ -209,7 +220,13 @@ export default function WhatsAppPanel() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      alert(`✓ Sent to ${singlePhone}`);
+
+      if (channel === "whatsapp" && data.link) {
+        window.open(data.link, "_blank");
+        alert("WhatsApp opened. Tap Send in WhatsApp to deliver.");
+      } else {
+        alert(`✓ Sent to ${singlePhone}`);
+      }
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {
@@ -242,12 +259,51 @@ export default function WhatsAppPanel() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      alert(`Broadcast queued: ${data.queued} recipients`);
+
+      if (channel === "whatsapp") {
+        const items: WaQueueItem[] = Array.isArray(data.items) ? data.items : [];
+        setWaQueue(items);
+        setOpened(new Set());
+        alert(
+          `Ready to send ${items.length} WhatsApp messages. Click each "Send" button (or "Open Next 5") below to deliver.`
+        );
+      } else {
+        alert(`Broadcast queued: ${data.queued} recipients${data.failed ? ` (${data.failed} failed)` : ""}`);
+      }
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {
       setBusy(false);
     }
+  }
+
+  // -------------- WhatsApp queue handlers --------------
+  function openQueueItem(item: WaQueueItem) {
+    window.open(item.link, "_blank");
+    setOpened((prev) => {
+      const next = new Set(prev);
+      next.add(item.phone);
+      return next;
+    });
+  }
+
+  function openNextFive() {
+    const remaining = waQueue.filter((i) => !opened.has(i.phone)).slice(0, 5);
+    remaining.forEach((item, idx) => {
+      setTimeout(() => {
+        window.open(item.link, "_blank");
+        setOpened((prev) => {
+          const next = new Set(prev);
+          next.add(item.phone);
+          return next;
+        });
+      }, idx * 500);
+    });
+  }
+
+  function clearQueue() {
+    setWaQueue([]);
+    setOpened(new Set());
   }
 
   // ============================================================
@@ -305,14 +361,6 @@ export default function WhatsAppPanel() {
       boxShadow: `0 0 0 3px ${ok ? COLORS.success + "33" : COLORS.danger + "33"}`,
     }),
     statusText: { fontSize: 14, color: COLORS.textMuted, marginBottom: 8 },
-    qrBox: {
-      marginTop: 12,
-      padding: 12,
-      background: COLORS.bg,
-      borderRadius: 8,
-      textAlign: "center" as const,
-    },
-    qrImg: { maxWidth: 240, width: "100%", borderRadius: 4 },
     label: {
       display: "block",
       fontSize: 12,
@@ -408,6 +456,22 @@ export default function WhatsAppPanel() {
       borderBottom: `1px solid ${COLORS.border}`,
       fontSize: 14,
     },
+    queueList: {
+      maxHeight: 360,
+      overflowY: "auto",
+      border: `1px solid ${COLORS.border}`,
+      borderRadius: 8,
+      marginTop: 8,
+    },
+    queueRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "10px 12px",
+      borderBottom: `1px solid ${COLORS.border}`,
+      fontSize: 14,
+      gap: 8,
+    },
     logBox: {
       background: COLORS.greenDark,
       color: "#d4f5db",
@@ -421,7 +485,7 @@ export default function WhatsAppPanel() {
     logEntry: (status: string): React.CSSProperties => ({
       padding: "4px 8px",
       borderLeft: `3px solid ${
-        status === "success" ? COLORS.success : COLORS.danger
+        status === "failed" ? COLORS.danger : COLORS.success
       }`,
       marginBottom: 4,
       background: "rgba(255,255,255,0.05)",
@@ -460,47 +524,23 @@ export default function WhatsAppPanel() {
           {/* WhatsApp Status */}
           <div style={styles.card}>
             <h3 style={styles.cardTitle}>
-              <span style={styles.statusDot(waStatus.ready)} />
-              WhatsApp Connection
+              <span style={styles.statusDot(true)} />
+              WhatsApp — Click-to-Send Mode
             </h3>
-            <div style={styles.statusText}>
-              State: <strong>{waStatus.state || "UNKNOWN"}</strong>
-              {waStatus.ready && (
-                <span style={styles.badge}>READY</span>
-              )}
+            <p style={{ fontSize: 13, color: COLORS.textMuted, margin: 0 }}>
+              Messages open WhatsApp on your device with the text pre-filled. Tap Send to deliver.
+            </p>
+            <div style={{ ...styles.statusText, marginTop: 12 }}>
+              Mode: <strong>{waStatus.mode || "wa.me"}</strong>
+              <span style={styles.badge}>READY</span>
             </div>
-            {waStatus.info?.pushname && (
-              <div style={styles.statusText}>
-                Account: <strong>{waStatus.info.pushname}</strong>
-              </div>
-            )}
-            {waStatus.qr && !waStatus.ready && (
-              <div style={styles.qrBox}>
-                <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600 }}>
-                  📷 Scan with WhatsApp on your phone:
-                </p>
-                <img
-                  src={waStatus.qr}
-                  alt="WhatsApp QR Code"
-                  style={styles.qrImg}
-                />
-                <p style={{ margin: "8px 0 0", fontSize: 11, color: COLORS.textMuted }}>
-                  WhatsApp → Settings → Linked Devices → Link a Device
-                </p>
-              </div>
-            )}
-            {!waStatus.qr && !waStatus.ready && (
-              <p style={{ fontSize: 13, color: COLORS.textMuted }}>
-                Initializing... if this takes long, check the server console.
-              </p>
-            )}
           </div>
 
           {/* SMS Gateway Status */}
           <div style={styles.card}>
             <h3 style={styles.cardTitle}>
               <span style={styles.statusDot(smsStatus.available)} />
-              SMS Gateway (Android)
+              SMS Gateway
             </h3>
             <div style={styles.statusText}>
               Status:{" "}
@@ -510,11 +550,14 @@ export default function WhatsAppPanel() {
               {smsStatus.available && <span style={styles.badge}>READY</span>}
             </div>
             <div style={{ ...styles.statusText, fontSize: 12 }}>
-              Gateway: <code>{smsStatus.gatewayUrl || "not set"}</code>
+              Provider: <code>{smsStatus.provider || "Not configured"}</code>
+            </div>
+            <div style={{ ...styles.statusText, fontSize: 12 }}>
+              Sender: <code>{smsStatus.sender || "PottersHub"}</code>
             </div>
             {!smsStatus.available && (
               <p style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 8 }}>
-                Install the Android SMS Gateway app on your phone and set the IP in the server <code>.env</code> file.
+                SMS not configured. Ask your developer to set TERMII_API_KEY.
               </p>
             )}
           </div>
@@ -531,11 +574,20 @@ export default function WhatsAppPanel() {
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
-              {MESSAGE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
+              {Object.keys(groupedTemplates).length === 0 ? (
+                <option value="welcome">Welcome New Member</option>
+              ) : (
+                Object.entries(groupedTemplates).map(([groupName, opts]) => (
+                  <optgroup key={groupName} label={groupName}>
+                    {opts.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.icon ? `${t.icon} ` : ""}
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              )}
             </select>
 
             {type === "custom" && (
@@ -585,7 +637,7 @@ export default function WhatsAppPanel() {
               <button
                 style={{ ...styles.btn, ...styles.btnPrimary }}
                 onClick={() => sendSingle("whatsapp")}
-                disabled={busy || !waStatus.ready}
+                disabled={busy}
               >
                 💬 Send WhatsApp
               </button>
@@ -598,7 +650,7 @@ export default function WhatsAppPanel() {
               </button>
             </div>
             <p style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 12 }}>
-              Buttons are disabled when the corresponding channel is not connected.
+              WhatsApp opens on your device with the message pre-filled. SMS is disabled when the provider is not configured.
             </p>
           </div>
         </div>
@@ -689,8 +741,7 @@ export default function WhatsAppPanel() {
             <h3 style={styles.cardTitle}>📢 Broadcast to All Members</h3>
             <p style={{ fontSize: 13, color: COLORS.textMuted }}>
               Sends the selected message type to all <strong>{members.length}</strong> members on your list.
-              Each message is personalized with the member&apos;s name and includes a 2–4 second random
-              delay between sends to avoid being blocked.
+              WhatsApp uses click-to-send (each message opens on your device for you to tap Send). SMS sends automatically via the server.
             </p>
             <div style={styles.btnRow}>
               <button
@@ -701,7 +752,7 @@ export default function WhatsAppPanel() {
                   padding: "14px",
                 }}
                 onClick={() => broadcast("whatsapp")}
-                disabled={busy || !waStatus.ready || members.length === 0}
+                disabled={busy || members.length === 0}
               >
                 💬 Broadcast WhatsApp to {members.length}
               </button>
@@ -720,6 +771,80 @@ export default function WhatsAppPanel() {
                 📩 Broadcast SMS to {members.length}
               </button>
             </div>
+
+            {/* WhatsApp send queue */}
+            {waQueue.length > 0 && (
+              <>
+                <h4
+                  style={{
+                    ...styles.cardTitle,
+                    marginTop: 20,
+                    fontSize: 13,
+                  }}
+                >
+                  📤 WhatsApp Send Queue ({opened.size}/{waQueue.length} opened)
+                </h4>
+                <div style={styles.btnRow}>
+                  <button
+                    style={{ ...styles.btn, ...styles.btnPrimary }}
+                    onClick={openNextFive}
+                    disabled={opened.size >= waQueue.length}
+                  >
+                    ⏭ Open Next 5
+                  </button>
+                  <button
+                    style={{ ...styles.btn, ...styles.btnDanger }}
+                    onClick={clearQueue}
+                  >
+                    Clear Queue
+                  </button>
+                </div>
+                <div style={styles.queueList}>
+                  {waQueue.map((item) => {
+                    const isOpened = opened.has(item.phone);
+                    return (
+                      <div key={item.phone} style={styles.queueRow}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{item.name}</strong>
+                          <span
+                            style={{
+                              color: COLORS.textMuted,
+                              marginLeft: 8,
+                              fontSize: 12,
+                            }}
+                          >
+                            {item.phone}
+                          </span>
+                        </div>
+                        {isOpened ? (
+                          <span
+                            style={{
+                              color: COLORS.success,
+                              fontWeight: 600,
+                              fontSize: 13,
+                            }}
+                          >
+                            ✓ Opened
+                          </span>
+                        ) : (
+                          <button
+                            style={{
+                              ...styles.btn,
+                              ...styles.btnPrimary,
+                              padding: "6px 12px",
+                              fontSize: 13,
+                            }}
+                            onClick={() => openQueueItem(item)}
+                          >
+                            📤 Send
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -736,8 +861,11 @@ export default function WhatsAppPanel() {
                     [{new Date(entry.time).toLocaleTimeString()}]
                   </strong>{" "}
                   {entry.channel?.toUpperCase()} →{" "}
-                  {entry.status === "success" ? "✓" : "✗"} {entry.to}
+                  {entry.status === "failed" ? "✗" : "✓"} {entry.to}
                   {entry.name && ` (${entry.name})`}
+                  {entry.type && (
+                    <span style={{ opacity: 0.7 }}> [{entry.type}]</span>
+                  )}
                   {entry.error && (
                     <span style={{ color: "#ffb3b3" }}> — {entry.error}</span>
                   )}
