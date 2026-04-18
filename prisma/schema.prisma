@@ -125,6 +125,7 @@ model User {
   createdEvents     Event[]
   passwordResetTokens PasswordResetToken[]
   createdMemberLists MemberList[]
+  fileUploads        FileUpload[]
 
   @@map("users")
   birthDay   Int?     @map("birth_day")
@@ -1011,4 +1012,26 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ============================================
+// FILE UPLOADS (self-hosted mini-Dropbox)
+// ============================================
+
+model FileUpload {
+  id            String   @id @default(uuid())
+  uuid          String   @unique @default(uuid())
+  originalName  String   @map("original_name")
+  safeName      String   @map("safe_name")
+  mimeType      String?  @map("mime_type")
+  sizeBytes     BigInt   @map("size_bytes")
+  path          String
+  label         String?
+  uploadedById  String?  @map("uploaded_by_id")
+  uploadedBy    User?    @relation(fields: [uploadedById], references: [id])
+  downloadCount Int      @default(0) @map("download_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("file_uploads")
 }

@@ -14,6 +14,9 @@ import {
   Search,
   Cake,
   Briefcase,
+  Link2,
+  Copy,
+  File as FileIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +68,35 @@ export default function OutreachPage() {
   const [loadingAll, setLoadingAll] = useState(false);
   const [search, setSearch] = useState("");
   const [pickerSelectedKeys, setPickerSelectedKeys] = useState<Set<string>>(new Set());
+
+  // Stored-file link picker
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [myFiles, setMyFiles] = useState<
+    Array<{ id: string; originalName: string; url: string; sizeBytes: number; label: string | null }>
+  >([]);
+  const [loadingMyFiles, setLoadingMyFiles] = useState(false);
+
+  async function openFileLinkPicker() {
+    setFilePickerOpen(true);
+    setLoadingMyFiles(true);
+    try {
+      const r = await fetch("/api/admin/files").then((res) => res.json());
+      setMyFiles(r.files || []);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load files");
+    } finally {
+      setLoadingMyFiles(false);
+    }
+  }
+  function insertFileUrl(f: { originalName: string; url: string }) {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "https://tphc.org.ng";
+    const fullUrl = `${origin}${f.url}`;
+    const prefix = customBody && !customBody.endsWith("\n") ? "\n" : "";
+    setCustomBody(customBody + prefix + "📎 " + f.originalName + ": " + fullUrl);
+    setFilePickerOpen(false);
+    toast.success("Link inserted");
+  }
 
   // Attachments (WhatsApp only)
   const [files, setFiles] = useState<File[]>([]);
@@ -420,7 +452,19 @@ export default function OutreachPage() {
           </div>
 
           <div>
-            <Label>Message (use {"{{name}}"} for personalization)</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Message (use {"{{name}}"} for personalization)</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={openFileLinkPicker}
+                className="h-7"
+              >
+                <Link2 className="h-3 w-3 mr-1" />
+                Insert File Link
+              </Button>
+            </div>
             <Textarea
               rows={5}
               value={customBody}
@@ -744,6 +788,71 @@ export default function OutreachPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* File-link picker */}
+      <Dialog open={filePickerOpen} onOpenChange={setFilePickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Insert File Link</DialogTitle>
+            <DialogDescription>
+              Pick a previously uploaded file — its public URL will be appended
+              to your message.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-y-auto space-y-1">
+            {loadingMyFiles ? (
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…
+              </div>
+            ) : myFiles.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-6 text-center">
+                No files uploaded yet. Go to{" "}
+                <a
+                  href="/admin/files"
+                  className="underline"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Files
+                </a>{" "}
+                to upload some.
+              </div>
+            ) : (
+              myFiles.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => insertFileUrl(f)}
+                  className="w-full flex items-center gap-3 p-2 rounded border text-left hover:bg-muted transition"
+                >
+                  <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate">{f.originalName}</div>
+                    {f.label && (
+                      <div className="text-xs text-muted-foreground truncate">
+                        {f.label}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground">
+                      {f.sizeBytes < 1024 * 1024
+                        ? `${(f.sizeBytes / 1024).toFixed(1)} KB`
+                        : f.sizeBytes < 1024 * 1024 * 1024
+                        ? `${(f.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+                        : `${(f.sizeBytes / 1024 / 1024 / 1024).toFixed(2)} GB`}
+                    </div>
+                  </div>
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFilePickerOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
   CalendarDays,
   BookMarked,
   HardHat,
+  FolderUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChurchLogoIcon } from "@/components/church-logo"
@@ -76,6 +77,7 @@ const sidebarNavItems = [
   { title: "Blog", href: "/admin/blog", icon: FileText },
   { title: "Gallery", href: "/admin/gallery", icon: Image },
   { title: "Community", href: "/admin/community", icon: MessageSquare },  { title: "Outreach", href: "/admin/outreach", icon: Phone },
+  { title: "Files", href: "/admin/files", icon: FolderUp },
   { title: "Care Groups", href: "/admin/care-groups", icon: UsersRound },
   { title: "Communications", href: "/admin/communications", icon: Send },
   { title: "Settings", href: "/admin/settings", icon: Settings },
