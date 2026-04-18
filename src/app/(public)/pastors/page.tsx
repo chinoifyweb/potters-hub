@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -15,8 +15,9 @@ import {
   Video,
   FileText,
   Shield,
-  Clock,
   Filter,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +25,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Select,
@@ -68,6 +67,46 @@ const categoryColors: Record<string, string> = {
   devotional: "bg-amber-100 text-amber-800",
 };
 
+async function handlePortalLogout() {
+  try {
+    await signOut({ redirect: false });
+  } catch {}
+  try {
+    await fetch("/api/auth/hard-logout", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {}
+  try {
+    const killNames = [
+      "__Secure-next-auth.session-token",
+      "next-auth.session-token",
+      "__Host-next-auth.csrf-token",
+      "next-auth.csrf-token",
+      "__Secure-next-auth.callback-url",
+      "next-auth.callback-url",
+    ];
+    const killDomains = [
+      "",
+      "; domain=.tphc.org.ng",
+      "; domain=tphc.org.ng",
+      "; domain=www.tphc.org.ng",
+      "; domain=admin.tphc.org.ng",
+    ];
+    for (const n of killNames) {
+      for (const d of killDomains) {
+        document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${d}`;
+        document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${d}; secure; samesite=lax`;
+      }
+    }
+  } catch {}
+  try {
+    localStorage.removeItem("tphc_pastor_access");
+  } catch {}
+  window.location.href = "/login?t=" + Date.now();
+}
+
 export default function PastorsPortalPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -77,15 +116,22 @@ export default function PastorsPortalPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // One-time cleanup of legacy password-gate localStorage key
+  useEffect(() => {
+    try {
+      localStorage.removeItem("tphc_pastor_access");
+    } catch {}
+  }, []);
+
   // Redirect if not authenticated or not a pastor/admin
   useEffect(() => {
     if (status === "loading") return;
     if (!session) {
-      router.push("/login?callbackUrl=/pastors");
+      router.replace("/login?callbackUrl=/pastors");
       return;
     }
     if (session.user?.role !== "pastor" && session.user?.role !== "admin") {
-      router.push("/dashboard");
+      router.replace("/dashboard");
       return;
     }
   }, [session, status, router]);
@@ -113,19 +159,17 @@ export default function PastorsPortalPage() {
     fetchMessages();
   }, [session, status]);
 
-  // Show loading or unauthorized states
-  if (status === "loading" || loading) {
+  // Show loading state while session resolves
+  if (status === "loading" || !session) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">Loading Pastor&apos;s Portal...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!session || (session.user?.role !== "pastor" && session.user?.role !== "admin")) {
+  // Role check — middleware also enforces this
+  if (session.user?.role !== "pastor" && session.user?.role !== "admin") {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
@@ -169,35 +213,68 @@ export default function PastorsPortalPage() {
           }} />
         </div>
         <div className="container mx-auto px-4 py-12 md:py-16 relative">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-amber-400" />
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-amber-400" />
+                </div>
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30">
+                  Pastors Only
+                </Badge>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                Pastor&apos;s Portal
+              </h1>
+              <p className="text-slate-300 text-lg max-w-2xl">
+                Sermons, teachings, and resources exclusively for pastors and church leadership. Equipping those who equip others.
+              </p>
+              <div className="mt-6 flex items-center gap-4 text-sm text-slate-400 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  {messages.length} Messages
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <User className="h-4 w-4" />
+                  Welcome, {session.user?.name || "Pastor"}
+                </span>
+              </div>
             </div>
-            <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30">
-              Pastors Only
-            </Badge>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            Pastor&apos;s Portal
-          </h1>
-          <p className="text-slate-300 text-lg max-w-2xl">
-            Sermons, teachings, and resources exclusively for pastors and church leadership. Equipping those who equip others.
-          </p>
-          <div className="mt-6 flex items-center gap-4 text-sm text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <FileText className="h-4 w-4" />
-              {messages.length} Messages
-            </span>
-            <span className="flex items-center gap-1.5">
-              <User className="h-4 w-4" />
-              Welcome, {session.user?.name || "Pastor"}
-            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handlePortalLogout}
+              className="text-red-300 hover:text-white hover:bg-red-500/20 shrink-0"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Log out
+            </Button>
           </div>
         </div>
       </div>
 
+      {/* Quick Links */}
+      <div className="container mx-auto px-4 -mt-6 relative z-10 mb-6">
+        <Card className="shadow-lg bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <BookOpen className="h-5 w-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">Workers Teaching Manual</h3>
+                <p className="text-sm text-muted-foreground">52-week training curriculum for workers</p>
+              </div>
+            </div>
+            <Button asChild variant="default" size="sm">
+              <Link href="/pastors/workers">Open Manual</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Search & Filters */}
-      <div className="container mx-auto px-4 -mt-6 relative z-10">
+      <div className="container mx-auto px-4 relative z-10">
         <Card className="shadow-lg">
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-3">
@@ -231,7 +308,11 @@ export default function PastorsPortalPage() {
 
       {/* Messages List */}
       <div className="container mx-auto px-4 py-8">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <h3 className="text-lg font-medium">No messages found</h3>
@@ -266,19 +347,13 @@ export default function PastorsPortalPage() {
                               message.category}
                           </Badge>
                           {message.audioUrl && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs gap-1"
-                            >
+                            <Badge variant="outline" className="text-xs gap-1">
                               <Mic className="h-3 w-3" />
                               Audio
                             </Badge>
                           )}
                           {message.videoUrl && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs gap-1"
-                            >
+                            <Badge variant="outline" className="text-xs gap-1">
                               <Video className="h-3 w-3" />
                               Video
                             </Badge>
@@ -321,11 +396,9 @@ export default function PastorsPortalPage() {
                     </div>
                   </div>
 
-                  {/* Expanded Content */}
                   {isExpanded && (
                     <div className="border-t bg-slate-50/50">
                       <div className="p-5 space-y-5">
-                        {/* Message Content */}
                         {message.content && (
                           <div>
                             <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -336,12 +409,10 @@ export default function PastorsPortalPage() {
                             </p>
                           </div>
                         )}
-
-                        {/* Sermon Notes / Outline */}
                         {message.notes && (
                           <div>
                             <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              Sermon Notes & Outline
+                              Sermon Notes &amp; Outline
                             </h4>
                             <div className="bg-white rounded-lg border p-4">
                               <pre className="text-sm text-foreground whitespace-pre-line font-sans leading-relaxed">
@@ -350,17 +421,11 @@ export default function PastorsPortalPage() {
                             </div>
                           </div>
                         )}
-
-                        {/* Media Links */}
                         {(message.audioUrl || message.videoUrl) && (
                           <div className="flex gap-3 pt-2">
                             {message.audioUrl && (
                               <Button variant="outline" size="sm" asChild>
-                                <a
-                                  href={message.audioUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
+                                <a href={message.audioUrl} target="_blank" rel="noopener noreferrer">
                                   <Mic className="mr-2 h-4 w-4" />
                                   Listen to Audio
                                 </a>
@@ -368,11 +433,7 @@ export default function PastorsPortalPage() {
                             )}
                             {message.videoUrl && (
                               <Button variant="outline" size="sm" asChild>
-                                <a
-                                  href={message.videoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
+                                <a href={message.videoUrl} target="_blank" rel="noopener noreferrer">
                                   <Video className="mr-2 h-4 w-4" />
                                   Watch Video
                                 </a>
