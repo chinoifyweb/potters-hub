@@ -70,11 +70,11 @@ export default function OutreachPage() {
   const [files, setFiles] = useState<File[]>([]);
   function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = e.target.files ? Array.from(e.target.files) : [];
-    const tooBig = list.filter((f) => f.size > 50 * 1024 * 1024);
+    const tooBig = list.filter((f) => f.size > 200 * 1024 * 1024);
     if (tooBig.length > 0) {
-      toast.error(`Skipped ${tooBig.length} file(s) over 50MB: ${tooBig.map((f) => f.name).join(", ")}`);
+      toast.error(`Skipped ${tooBig.length} file(s) over 200MB: ${tooBig.map((f) => f.name).join(", ")}`);
     }
-    const under = list.filter((f) => f.size <= 50 * 1024 * 1024);
+    const under = list.filter((f) => f.size <= 200 * 1024 * 1024);
     const combined = [...files, ...under].slice(0, 10);
     setFiles(combined);
     e.target.value = ""; // allow re-selecting same file
@@ -430,7 +430,7 @@ export default function OutreachPage() {
 
           {/* Attachments (WhatsApp only) */}
           <div>
-            <Label>Attachments (WhatsApp only, up to 10 files, 50MB each)</Label>
+            <Label>Attachments (WhatsApp only, up to 10 files, 200MB each)</Label>
             <Input
               type="file"
               multiple

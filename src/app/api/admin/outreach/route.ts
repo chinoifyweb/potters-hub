@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const MAX_FILES = 10;
-const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_BYTES = 200 * 1024 * 1024; // 200MB
 const UPLOADS_DIR = "/home/tphc.org.ng/nodeapp/uploads/outreach";
 
 export async function GET() {
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     for (const f of fileFields) {
       if (f.size > MAX_FILE_BYTES) {
         return NextResponse.json(
-          { error: `File "${f.name}" exceeds 50MB limit` },
+          { error: `File "${f.name}" exceeds 200MB limit` },
           { status: 400 },
         );
       }
