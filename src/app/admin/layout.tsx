@@ -284,7 +284,52 @@ export default function AdminLayout({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive cursor-pointer"
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={async () => {
+                      try {
+                        // 1) Let NextAuth do its normal signout (clears its
+                        //    own cookies server-side via Set-Cookie).
+                        await signOut({ redirect: false })
+                      } catch (_) {
+                        // swallow; we'll force-clear below
+                      }
+                      try {
+                        // 2) Hit our hard-logout endpoint which nukes every
+                        //    cookie variant across every domain.
+                        await fetch("/api/auth/hard-logout", {
+                          method: "POST",
+                          credentials: "include",
+                          cache: "no-store",
+                        })
+                      } catch (_) {}
+                      // 3) Also scrub from the client side (covers any
+                      //    cookie the browser would only let JS see).
+                      try {
+                        const killNames = [
+                          "__Secure-next-auth.session-token",
+                          "next-auth.session-token",
+                          "__Host-next-auth.csrf-token",
+                          "next-auth.csrf-token",
+                          "__Secure-next-auth.callback-url",
+                          "next-auth.callback-url",
+                        ]
+                        const killDomains = [
+                          "",
+                          "; domain=.tphc.org.ng",
+                          "; domain=tphc.org.ng",
+                          "; domain=www.tphc.org.ng",
+                          "; domain=admin.tphc.org.ng",
+                        ]
+                        for (const n of killNames) {
+                          for (const d of killDomains) {
+                            document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${d}`
+                            document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${d}; secure; samesite=lax`
+                          }
+                        }
+                      } catch (_) {}
+                      // 4) Full-page reload with cache-buster so nothing
+                      //    stale (RSC, browser bfcache, etc) sticks.
+                      window.location.href = "/login?t=" + Date.now()
+                    }}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out

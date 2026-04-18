@@ -61,10 +61,16 @@ export async function middleware(request: NextRequest) {
 
     // If path doesn't start with /admin, rewrite to /admin prefix
     if (!pathname.startsWith("/admin") && !pathname.startsWith("/api")) {
-      return NextResponse.rewrite(new URL(`/admin${pathname}`, request.url));
+      const rewriteRes = NextResponse.rewrite(new URL(`/admin${pathname}`, request.url));
+      rewriteRes.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      return rewriteRes;
     }
 
-    return NextResponse.next();
+    const subRes = NextResponse.next();
+    subRes.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    subRes.headers.set("Pragma", "no-cache");
+    subRes.headers.set("Expires", "0");
+    return subRes;
   }
 
   // --- MAIN DOMAIN ROUTING (tphc.org.ng) ---
@@ -162,7 +168,15 @@ export async function middleware(request: NextRequest) {
     if (token.role !== "admin" && token.role !== "pastor") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    return NextResponse.next();
+    // Defense-in-depth: make sure nothing (LiteSpeed, Cloudflare, browser
+    // bfcache) caches authenticated admin HTML. If the session is killed,
+    // the next navigation must re-hit the origin and re-run middleware so
+    // the redirect-to-login fires.
+    const adminRes = NextResponse.next();
+    adminRes.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    adminRes.headers.set("Pragma", "no-cache");
+    adminRes.headers.set("Expires", "0");
+    return adminRes;
   }
 
   // API admin routes
