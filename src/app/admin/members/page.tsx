@@ -38,6 +38,8 @@ export default function Page() {
   const [birthDay, setBirthDay] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [role, setRole] = useState("member");
+  const [isWorker, setIsWorker] = useState(false);
+  const [workerDepartment, setWorkerDepartment] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -69,7 +71,7 @@ export default function Page() {
   };
 
   function reset() {
-    setFullName(""); setEmail(""); setBirthDay(""); setBirthMonth(""); setPhone(""); setRole("member"); setEditingId(null);
+    setFullName(""); setEmail(""); setBirthDay(""); setBirthMonth(""); setPhone(""); setRole("member"); setIsWorker(false); setWorkerDepartment(""); setEditingId(null);
   }
   function openNew() { reset(); setOpen(true); }
   function openEdit(m: M) {
@@ -89,7 +91,7 @@ export default function Page() {
         r = await fetch(`/api/admin/members/${editingId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null }),
+          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null, isWorker, workerDepartment: workerDepartment || null }),
         });
       } else {
         r = await fetch("/api/admin/members", {
@@ -238,6 +240,41 @@ export default function Page() {
                 <option value="admin">Admin</option>
               </select>
             </div>
+            {!editingId && (
+              <div className="pt-2 border-t">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isWorker}
+                    onChange={(e) => setIsWorker(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm font-medium">Also register this person as a Worker</span>
+                </label>
+                {isWorker && (
+                  <div className="mt-2">
+                    <Label>Department (optional)</Label>
+                    <select
+                      value={workerDepartment}
+                      onChange={(e) => setWorkerDepartment(e.target.value)}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    >
+                      <option value="">— choose —</option>
+                      <option value="Choir">Choir</option>
+                      <option value="Ushers">Ushers</option>
+                      <option value="Media">Media</option>
+                      <option value="Children">Children</option>
+                      <option value="Security">Security</option>
+                      <option value="Tech">Tech</option>
+                      <option value="Prayer">Prayer</option>
+                      <option value="Evangelism">Evangelism</option>
+                      <option value="Welfare">Welfare</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

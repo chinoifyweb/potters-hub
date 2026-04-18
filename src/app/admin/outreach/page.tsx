@@ -1,15 +1,51 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Send, Smartphone, MessageCircle, Loader2, Plus, Trash2, RefreshCw , LogOut} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Send,
+  Smartphone,
+  MessageCircle,
+  Loader2,
+  RefreshCw,
+  Users,
+  HardHat,
+  UserPlus,
+  CheckSquare,
+  X,
+  Search,
+  Cake,
+  Briefcase,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-type Recipient = { name: string; phone: string };
+type Contact = {
+  key: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  birthDay?: number;
+  birthMonth?: number;
+  department?: string;
+  firstVisitDate?: string;
+  tags: string[];
+  sources?: any[];
+};
+
+type AudienceValue = "all" | "workers" | "firsttimers" | "custom";
 
 export default function OutreachPage() {
   const [waStatus, setWaStatus] = useState<any>({ ready: false });
@@ -17,9 +53,18 @@ export default function OutreachPage() {
   const [type, setType] = useState("welcome");
   const [customBody, setCustomBody] = useState("");
   const [templates, setTemplates] = useState<Record<string, string>>({});
-  const [recipients, setRecipients] = useState<Recipient[]>([{ name: "", phone: "" }]);
   const [sending, setSending] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+
+  // New audience state
+  const [audience, setAudience] = useState<AudienceValue | null>(null);
+  const [selected, setSelected] = useState<Contact[]>([]);
+  const [loadingAudience, setLoadingAudience] = useState<AudienceValue | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pickerSelectedKeys, setPickerSelectedKeys] = useState<Set<string>>(new Set());
 
   async function loadStatus() {
     try {
@@ -60,32 +105,133 @@ export default function OutreachPage() {
     if (templates[type]) setCustomBody(templates[type]);
   }, [type]);
 
-  function addRecipient() { setRecipients([...recipients, { name: "", phone: "" }]); }
-  function updateRec(i: number, field: keyof Recipient, val: string) {
-    const next = [...recipients]; next[i] = { ...next[i], [field]: val }; setRecipients(next);
+  async function ensureAllContacts() {
+    if (allContacts.length > 0) return allContacts;
+    setLoadingAll(true);
+    try {
+      const r = await fetch("/api/admin/contacts?audience=all").then((r) => r.json());
+      const list: Contact[] = r.contacts || [];
+      setAllContacts(list);
+      return list;
+    } catch (e) {
+      toast.error("Failed to load contacts");
+      return [];
+    } finally {
+      setLoadingAll(false);
+    }
   }
-  function removeRec(i: number) { setRecipients(recipients.filter((_, idx) => idx !== i)); }
+
+  async function selectAudience(a: AudienceValue) {
+    setAudience(a);
+    if (a === "custom") {
+      setPickerSelectedKeys(new Set(selected.map((c) => c.key)));
+      setPickerOpen(true);
+      await ensureAllContacts();
+      return;
+    }
+    setLoadingAudience(a);
+    try {
+      const qp =
+        a === "firsttimers" ? "audience=firsttimers&sinceDays=7" : `audience=${a}`;
+      const r = await fetch(`/api/admin/contacts?${qp}`).then((r) => r.json());
+      const list: Contact[] = r.contacts || [];
+      setSelected(list);
+      const label =
+        a === "all" ? "members" : a === "workers" ? "workers" : "first-timers";
+      toast.success(`Loaded ${list.length} ${label}`);
+    } catch {
+      toast.error("Failed to load audience");
+    } finally {
+      setLoadingAudience(null);
+    }
+  }
+
+  function removeFromSelected(key: string) {
+    setSelected((prev) => prev.filter((c) => c.key !== key));
+  }
+
+  function clearSelected() {
+    setSelected([]);
+    setAudience(null);
+  }
+
+  // Picker filtering
+  const filteredPickerContacts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allContacts;
+    return allContacts.filter(
+      (c) =>
+        c.fullName.toLowerCase().includes(q) ||
+        (c.phone || "").toLowerCase().includes(q) ||
+        (c.email || "").toLowerCase().includes(q),
+    );
+  }, [allContacts, search]);
+
+  function togglePickerKey(key: string, checked: boolean) {
+    setPickerSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  function selectAllFiltered() {
+    setPickerSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const c of filteredPickerContacts) next.add(c.key);
+      return next;
+    });
+  }
+
+  function clearAllFiltered() {
+    setPickerSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const c of filteredPickerContacts) next.delete(c.key);
+      return next;
+    });
+  }
+
+  function confirmPicker() {
+    const byKey = new Map<string, Contact>(allContacts.map((c) => [c.key, c]));
+    const picked: Contact[] = [];
+    Array.from(pickerSelectedKeys).forEach((k) => {
+      const c = byKey.get(k);
+      if (c) picked.push(c);
+    });
+    setSelected(picked);
+    setPickerOpen(false);
+    toast.success(`Selected ${picked.length} contact(s)`);
+  }
 
   async function send() {
-    const valid = recipients.filter(r => r.phone.trim());
-    if (!valid.length) { toast.error("Add at least one recipient"); return; }
-    if (!customBody.trim()) { toast.error("Message required"); return; }
+    if (selected.length === 0) {
+      toast.error("Select an audience first");
+      return;
+    }
+    if (!customBody.trim()) {
+      toast.error("Message required");
+      return;
+    }
     setSending(true);
     try {
       const r = await fetch("/api/admin/outreach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel, type, customBody, recipients: valid }),
+        body: JSON.stringify({
+          channel,
+          type,
+          customBody,
+          recipients: selected.map((c) => ({ name: c.fullName, phone: c.phone })),
+        }),
       });
       const data = await r.json();
       const results = data.results || [];
 
-      // WhatsApp results summary
       const wa = results.filter((x: any) => x.channel === "whatsapp");
       const waOk = wa.filter((x: any) => x.ok).length;
       const waFail = wa.length - waOk;
 
-      // Open wa.me fallback links for any failed WA sends (e.g. service offline / not ready)
       const fallbackLinks = wa.filter((x: any) => !x.ok && x.link);
       fallbackLinks.forEach((x: any, i: number) => {
         setTimeout(() => window.open(x.link, "_blank", "noopener"), i * 600);
@@ -101,7 +247,6 @@ export default function OutreachPage() {
         }
       }
 
-      // SMS result summary
       const sms = results.filter((x: any) => x.channel === "sms");
       const smsOk = sms.filter((x: any) => x.ok).length;
       const smsFail = sms.length - smsOk;
@@ -115,21 +260,42 @@ export default function OutreachPage() {
       }
 
       loadLogs();
-    } catch { toast.error("Send failed"); } finally { setSending(false); }
+    } catch {
+      toast.error("Send failed");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Send className="h-7 w-7" />Outreach</h1>
-        <p className="text-muted-foreground">Send WhatsApp and SMS messages to visitors and members</p>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Send className="h-7 w-7" />
+          Outreach
+        </h1>
+        <p className="text-muted-foreground">
+          Send WhatsApp and SMS messages to visitors and members
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-5 w-5" />WhatsApp</h3>
-            <Button variant="ghost" size="sm" onClick={loadStatus}><RefreshCw className="h-4 w-4" /></Button>
+            <h3 className="font-semibold flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              WhatsApp
+            </h3>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={loadStatus}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              {waStatus.ready && (
+                <Button variant="ghost" size="sm" onClick={disconnectWA} title="Disconnect">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {waStatus.ready ? (
@@ -145,7 +311,11 @@ export default function OutreachPage() {
             {waStatus.qr && !waStatus.ready && (
               <div className="mt-3 p-4 bg-muted rounded-md text-center">
                 <p className="text-sm font-medium mb-2">📱 Scan with your WhatsApp phone:</p>
-                <img src={waStatus.qr} alt="WhatsApp QR" className="mx-auto max-w-[240px] rounded bg-white p-2" />
+                <img
+                  src={waStatus.qr}
+                  alt="WhatsApp QR"
+                  className="mx-auto max-w-[240px] rounded bg-white p-2"
+                />
                 <p className="text-xs text-muted-foreground mt-2">
                   WhatsApp → Settings → Linked Devices → Link a Device
                 </p>
@@ -172,20 +342,33 @@ export default function OutreachPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><h3 className="font-semibold flex items-center gap-2"><Smartphone className="h-5 w-5" />SMS</h3></CardHeader>
+          <CardHeader>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              SMS
+            </h3>
+          </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">SMS via Termii if TERMII_API_KEY is set.</p>
+            <p className="text-sm text-muted-foreground">
+              SMS via Termii if TERMII_API_KEY is set.
+            </p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><h2 className="font-semibold">Compose Message</h2></CardHeader>
-        <CardContent className="space-y-4">
+        <CardHeader>
+          <h2 className="font-semibold">Compose Message</h2>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Channel</Label>
-              <select value={channel} onChange={e => setChannel(e.target.value as any)} className="w-full border rounded px-3 py-2">
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value as any)}
+                className="w-full border rounded px-3 py-2"
+              >
                 <option value="whatsapp">WhatsApp only</option>
                 <option value="sms">SMS only</option>
                 <option value="both">Both</option>
@@ -193,7 +376,11 @@ export default function OutreachPage() {
             </div>
             <div>
               <Label>Template</Label>
-              <select value={type} onChange={e => setType(e.target.value)} className="w-full border rounded px-3 py-2">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+              >
                 <option value="welcome">Welcome (new visitor)</option>
                 <option value="absence">Absence follow-up</option>
                 <option value="birthday">Birthday</option>
@@ -202,53 +389,330 @@ export default function OutreachPage() {
               </select>
             </div>
           </div>
+
           <div>
             <Label>Message (use {"{{name}}"} for personalization)</Label>
-            <Textarea rows={5} value={customBody} onChange={e => setCustomBody(e.target.value)} />
+            <Textarea
+              rows={5}
+              value={customBody}
+              onChange={(e) => setCustomBody(e.target.value)}
+            />
           </div>
+
+          {/* Audience selector */}
+          <div>
+            <Label>Audience</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+              <AudienceChip
+                value="all"
+                current={audience}
+                loading={loadingAudience === "all"}
+                label="All Members"
+                icon={<Users className="h-4 w-4" />}
+                onClick={() => selectAudience("all")}
+              />
+              <AudienceChip
+                value="workers"
+                current={audience}
+                loading={loadingAudience === "workers"}
+                label="Workers"
+                icon={<HardHat className="h-4 w-4" />}
+                onClick={() => selectAudience("workers")}
+              />
+              <AudienceChip
+                value="firsttimers"
+                current={audience}
+                loading={loadingAudience === "firsttimers"}
+                label="First Timers (7 days)"
+                icon={<UserPlus className="h-4 w-4" />}
+                onClick={() => selectAudience("firsttimers")}
+              />
+              <AudienceChip
+                value="custom"
+                current={audience}
+                loading={false}
+                label="Choose Contacts"
+                icon={<CheckSquare className="h-4 w-4" />}
+                onClick={() => selectAudience("custom")}
+              />
+            </div>
+          </div>
+
+          {/* Selected recipients viewer */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label>Recipients</Label>
-              <Button variant="outline" size="sm" onClick={addRecipient}><Plus className="h-4 w-4 mr-1" />Add</Button>
+              <Label>Recipients ({selected.length})</Label>
+              <div className="flex gap-2">
+                {audience === "custom" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setPickerSelectedKeys(new Set(selected.map((c) => c.key)));
+                      setPickerOpen(true);
+                      ensureAllContacts();
+                    }}
+                  >
+                    Edit selection
+                  </Button>
+                )}
+                {selected.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={clearSelected}>
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              {recipients.map((r, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input placeholder="Name" value={r.name} onChange={e => updateRec(i, "name", e.target.value)} />
-                  <Input placeholder="Phone (08...)" value={r.phone} onChange={e => updateRec(i, "phone", e.target.value)} />
-                  <Button variant="ghost" size="icon" onClick={() => removeRec(i)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              ))}
-            </div>
+            {selected.length === 0 ? (
+              <p className="text-sm text-muted-foreground border rounded-md p-4 text-center">
+                No recipients selected. Pick an audience above.
+              </p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-1">
+                {selected.map((c) => (
+                  <div
+                    key={c.key}
+                    className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium truncate">{c.fullName || "(no name)"}</span>
+                        <span className="text-muted-foreground">{c.phone}</span>
+                        {c.tags?.map((t) => (
+                          <Badge key={t} variant="secondary" className="text-xs">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                      {(c.department || c.birthDay) && (
+                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          {c.department && (
+                            <span className="inline-flex items-center gap-1">
+                              <Briefcase className="h-3 w-3" />
+                              {c.department}
+                            </span>
+                          )}
+                          {c.birthDay && c.birthMonth && (
+                            <span className="inline-flex items-center gap-1">
+                              <Cake className="h-3 w-3" />
+                              {c.birthDay}/{c.birthMonth}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeFromSelected(c.key)}
+                      className="h-7 w-7 flex-shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <Button onClick={send} disabled={sending} className="w-full">
-            {sending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Send to {recipients.filter(r => r.phone).length} recipient(s)
+
+          <Button
+            onClick={send}
+            disabled={sending || selected.length === 0}
+            className="w-full"
+          >
+            {sending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Send to {selected.length} recipient(s)
           </Button>
         </CardContent>
       </Card>
 
+      {/* Contact picker modal */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Choose Contacts</DialogTitle>
+            <DialogDescription>
+              Select specific people to message. Search by name, phone, or email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, phone, or email…"
+                className="pl-9"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {loadingAll
+                  ? "Loading contacts…"
+                  : `${filteredPickerContacts.length} shown · ${pickerSelectedKeys.size} selected`}
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={selectAllFiltered} disabled={loadingAll}>
+                  Select all filtered
+                </Button>
+                <Button size="sm" variant="ghost" onClick={clearAllFiltered} disabled={loadingAll}>
+                  Clear filtered
+                </Button>
+              </div>
+            </div>
+
+            <div className="border rounded-md max-h-[400px] overflow-y-auto">
+              {loadingAll ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                  Loading contacts…
+                </div>
+              ) : filteredPickerContacts.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  No contacts match your search.
+                </div>
+              ) : (
+                filteredPickerContacts.map((c) => {
+                  const checked = pickerSelectedKeys.has(c.key);
+                  return (
+                    <label
+                      key={c.key}
+                      className={`flex items-start gap-3 px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 ${
+                        checked ? "bg-muted/30" : ""
+                      }`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => togglePickerKey(c.key, !!v)}
+                        className="mt-1"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium truncate">
+                            {c.fullName || "(no name)"}
+                          </span>
+                          <span className="text-sm text-muted-foreground">{c.phone}</span>
+                          {c.tags?.map((t) => (
+                            <Badge key={t} variant="secondary" className="text-xs">
+                              {t}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          {c.email && <span className="truncate">{c.email}</span>}
+                          {c.department && (
+                            <span className="inline-flex items-center gap-1">
+                              <Briefcase className="h-3 w-3" />
+                              {c.department}
+                            </span>
+                          )}
+                          {c.birthDay && c.birthMonth && (
+                            <span className="inline-flex items-center gap-1">
+                              <Cake className="h-3 w-3" />
+                              {c.birthDay}/{c.birthMonth}
+                            </span>
+                          )}
+                          {c.firstVisitDate && (
+                            <span>First visit: {c.firstVisitDate}</span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmPicker}>
+              Use {pickerSelectedKeys.size} contact(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
-        <CardHeader><h2 className="font-semibold">Recent Messages</h2></CardHeader>
+        <CardHeader>
+          <h2 className="font-semibold">Recent Messages</h2>
+        </CardHeader>
         <CardContent>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {logs.map((l) => (
-              <div key={l.id} className="flex items-start justify-between text-sm border-b pb-2">
+              <div
+                key={l.id}
+                className="flex items-start justify-between text-sm border-b pb-2"
+              >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{l.channel}</Badge>
                     <span className="font-medium">{l.recipientName || l.recipient}</span>
-                    <Badge variant={l.status === "sent" ? "default" : "destructive"}>{l.status}</Badge>
+                    <Badge variant={l.status === "sent" ? "default" : "destructive"}>
+                      {l.status}
+                    </Badge>
                   </div>
                   <div className="text-muted-foreground mt-1 line-clamp-2">{l.body}</div>
                   {l.error && <div className="text-xs text-red-600">{l.error}</div>}
                 </div>
-                <div className="text-xs text-muted-foreground">{new Date(l.createdAt).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(l.createdAt).toLocaleString()}
+                </div>
               </div>
             ))}
-            {logs.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No messages yet</p>}
+            {logs.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No messages yet
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ---------- AudienceChip ----------
+
+function AudienceChip({
+  value,
+  current,
+  label,
+  icon,
+  loading,
+  onClick,
+}: {
+  value: AudienceValue;
+  current: AudienceValue | null;
+  label: string;
+  icon: React.ReactNode;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  const active = current === value;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className={`flex items-center gap-2 rounded-md border px-3 py-3 text-sm text-left transition-colors ${
+        active
+          ? "border-primary bg-primary/10 text-primary ring-1 ring-primary"
+          : "border-border hover:bg-muted"
+      } ${loading ? "opacity-60 cursor-wait" : ""}`}
+    >
+      <span
+        className={`flex h-8 w-8 items-center justify-center rounded-md ${
+          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        }`}
+      >
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
+      </span>
+      <span className="font-medium leading-tight">{label}</span>
+    </button>
   );
 }

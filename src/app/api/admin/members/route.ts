@@ -151,5 +151,32 @@ export async function POST(req: NextRequest) {
     },
     select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, isVerified: true, createdAt: true },
   });
-  return NextResponse.json({ user }, { status: 201 });
+
+  // Also register as worker if requested
+  let worker = null;
+  if (b.isWorker) {
+    try {
+      const existing = await prisma.worker.findFirst({ where: { phone: b.phone } });
+      if (!existing) {
+        worker = await prisma.worker.create({
+          data: {
+            fullName: b.fullName,
+            phone: b.phone,
+            email: b.email || null,
+            department: b.workerDepartment || null,
+            birthDay: typeof b.birthDay === "number" ? b.birthDay : null,
+            birthMonth: typeof b.birthMonth === "number" ? b.birthMonth : null,
+            isActive: true,
+          },
+        });
+      } else {
+        worker = existing;
+      }
+    } catch (e) {
+      console.error("[members POST] worker creation failed:", e);
+      // Don't fail — member was created OK
+    }
+  }
+
+  return NextResponse.json({ user, worker }, { status: 201 });
 }

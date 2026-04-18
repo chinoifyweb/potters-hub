@@ -27,7 +27,36 @@ export async function POST(req: NextRequest) {
       role: body.role || null,
       notes: body.notes || null,
       isActive: body.isActive ?? true,
+      birthDay: body.birthDay ?? null,
+      birthMonth: body.birthMonth ?? null,
     },
   });
+
+  // Auto-promote worker to member
+  try {
+    const existing = await prisma.user.findFirst({ where: { phone: body.phone } });
+    if (!existing) {
+      const normalized = body.phone.replace(/\D/g, "");
+      const safeEmail = body.email && body.email.trim()
+        ? body.email.trim().toLowerCase()
+        : `worker-${normalized}@tphc.org.ng`;
+      await prisma.user.create({
+        data: {
+          fullName: body.fullName,
+          email: safeEmail,
+          phone: body.phone,
+          role: "member",
+          isActive: true,
+          isVerified: false,
+          birthDay: body.birthDay ?? null,
+          birthMonth: body.birthMonth ?? null,
+          passwordHash: require("crypto").randomBytes(32).toString("hex"),
+        },
+      });
+    }
+  } catch (e) {
+    console.error("[workers POST] auto-promote failed:", e);
+  }
+
   return NextResponse.json({ worker }, { status: 201 });
 }
