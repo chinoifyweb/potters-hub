@@ -60,19 +60,21 @@ export const authOptions: NextAuthOptions = {
           const email = credentials.email.toLowerCase()
           console.log("[AUTH] Attempting login for:", email)
 
-          // Use Supabase REST API instead of Prisma (works over HTTPS from Vercel)
-          const { data: users, error } = await supabase
-            .from("church_users")
-            .select("id, email, password_hash, full_name, avatar_url, role, is_active")
-            .eq("email", email)
-            .limit(1)
-
-          if (error) {
-            console.error("[AUTH] Supabase query error:", error.message)
-            return null
-          }
-
-          const user = users?.[0]
+          // Query the local Prisma DB — single source of truth on the VPS
+          const prisma = (await import("./db")).default
+          const dbUser = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true, email: true, passwordHash: true, fullName: true, avatarUrl: true, role: true, isActive: true },
+          })
+          const user = dbUser ? {
+            id: dbUser.id,
+            email: dbUser.email,
+            password_hash: dbUser.passwordHash,
+            full_name: dbUser.fullName,
+            avatar_url: dbUser.avatarUrl,
+            role: dbUser.role,
+            is_active: dbUser.isActive,
+          } : null
 
           if (!user) {
             console.error("[AUTH] User not found:", email)
