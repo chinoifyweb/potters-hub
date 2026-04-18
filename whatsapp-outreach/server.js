@@ -78,8 +78,11 @@ const templates = {
 
 function renderTemplate(type, name, customMessage) {
   const safeName = name || "Beloved";
-  if (type === "custom" && customMessage) {
-    return customMessage.replace(/\{name\}/gi, safeName);
+  // ALWAYS prefer a provided message — the calling Next.js app already rendered
+  // the template, so this field IS the final admin-edited text. The internal
+  // templates below are only a fallback when no message is supplied.
+  if (customMessage && String(customMessage).trim()) {
+    return String(customMessage).replace(/\{name\}/gi, safeName).replace(/\{\{\s*name\s*\}\}/gi, safeName);
   }
   const fn = templates[type] || templates.broadcast;
   return fn(safeName);
