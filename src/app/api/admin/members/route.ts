@@ -128,15 +128,20 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if ((session.user as any).role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const b = await req.json().catch(() => ({}));
-  if (!b.fullName || !b.email) {
-    return NextResponse.json({ error: "fullName and email required" }, { status: 400 });
+  if (!b.fullName || !b.phone) {
+    return NextResponse.json({ error: "fullName and phone required" }, { status: 400 });
   }
-  const exists = await prisma.user.findUnique({ where: { email: b.email } });
-  if (exists) return NextResponse.json({ error: "A user with that email already exists" }, { status: 409 });
+  if (b.email) {
+    const exists = await prisma.user.findUnique({ where: { email: b.email } });
+    if (exists) return NextResponse.json({ error: "A user with that email already exists" }, { status: 409 });
+  }
+  // If no email provided, generate a placeholder (DB requires unique non-null email)
+  const emailToStore = b.email || ("member-" + Date.now() + "@placeholder.tphc.org.ng");
   const user = await prisma.user.create({
     data: {
       fullName: b.fullName,
-      email: b.email,
+      email: emailToStore,
+      passwordHash: "no-login",
       phone: b.phone || null,
       role: b.role || "member",
       isActive: true,

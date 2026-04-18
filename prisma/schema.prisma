@@ -793,6 +793,7 @@ model Visitor {
   firstVisitDate  DateTime  @default(now()) @map("first_visit_date")
   howHeard        String?   @map("how_heard")
   prayerRequest   String?   @map("prayer_request") @db.Text
+  address         String?   @db.Text
   wantsContact    Boolean   @default(true) @map("wants_contact")
   status          String    @default("new")
   assignedToId    String?   @map("assigned_to_id")

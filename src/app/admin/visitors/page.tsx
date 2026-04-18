@@ -40,6 +40,9 @@ export default function VisitorsPage() {
   const [wantsContact, setWantsContact] = useState(true);
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("new");
+  const [address, setAddress] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
 
   async function load() {
     setLoading(true);
@@ -56,22 +59,25 @@ export default function VisitorsPage() {
   useEffect(() => { load(); }, []);
 
   function reset() {
-    setFullName(""); setPhone(""); setEmail(""); setHowHeard(""); setPrayerRequest("");
+    setFullName(""); setPhone(""); setEmail(""); setAddress(""); setBirthDay(""); setBirthMonth(""); setHowHeard(""); setPrayerRequest("");
     setWantsContact(true); setNotes(""); setStatus("new"); setEditingId(null);
   }
   function openNew() { reset(); setOpen(true); }
+  function birthBack(v: string) { return v && v.trim() ? parseInt(v) : null; }
+
   function openEdit(v: Visitor) {
     setEditingId(v.id);
-    setFullName(v.fullName); setPhone(v.phone || ""); setEmail(v.email || "");
+    setFullName(v.fullName); setPhone(v.phone || ""); setEmail((v as any).email || ""); setAddress((v as any).address || ""); setBirthDay(String((v as any).birthDay || "")); setBirthMonth(String((v as any).birthMonth || ""));
     setHowHeard(v.howHeard || ""); setPrayerRequest(v.prayerRequest || "");
     setNotes(v.notes || ""); setStatus(v.status); setOpen(true);
   }
 
   async function save() {
     if (!fullName) { toast.error("Name required"); return; }
+    if (!phone) { toast.error("Phone number required"); return; }
     setSaving(true);
     try {
-      const payload = { fullName, phone, email, howHeard, prayerRequest, wantsContact, notes, status };
+      const payload = { fullName, phone, email, howHeard, prayerRequest, wantsContact, notes, status, address, birthDay: birthBack(birthDay), birthMonth: birthBack(birthMonth) };
       const url = editingId ? `/api/admin/visitors/${editingId}` : "/api/admin/visitors";
       const method = editingId ? "PUT" : "POST";
       const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -149,16 +155,35 @@ export default function VisitorsPage() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editingId ? "Edit Visitor" : "New Visitor"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? "Edit FirstTimer" : "New FirstTimer"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Full Name</Label><Input value={fullName} onChange={e => setFullName(e.target.value)} /></div>
+            <div><Label>Name *</Label><Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Full name" /></div>
+            <div><Label>Address</Label><Textarea rows={2} value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, area, city" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Phone</Label><Input value={phone} onChange={e => setPhone(e.target.value)} /></div>
-              <div><Label>Email</Label><Input value={email} onChange={e => setEmail(e.target.value)} /></div>
+              <div>
+                <Label>Day of Birth</Label>
+                <select value={birthDay} onChange={(e) => setBirthDay(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
+                  <option value="">—</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (<option key={d} value={d}>{d}</option>))}
+                </select>
+              </div>
+              <div>
+                <Label>Month of Birth</Label>
+                <select value={birthMonth} onChange={(e) => setBirthMonth(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
+                  <option value="">—</option>
+                  {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (<option key={m} value={i + 1}>{m}</option>))}
+                </select>
+              </div>
             </div>
-            <div><Label>How did they hear?</Label><Input value={howHeard} onChange={e => setHowHeard(e.target.value)} /></div>
-            <div><Label>Prayer Request</Label><Textarea rows={2} value={prayerRequest} onChange={e => setPrayerRequest(e.target.value)} /></div>
-            <div><Label>Notes</Label><Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
+            <div><Label>Phone Number *</Label><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="08012345678" /></div>
+            <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">More details (optional)</summary>
+              <div className="space-y-3 mt-3">
+                <div><Label>Email</Label><Input value={email} onChange={e => setEmail(e.target.value)} /></div>
+                <div><Label>How did they hear?</Label><Input value={howHeard} onChange={e => setHowHeard(e.target.value)} /></div>
+                <div><Label>Prayer Request</Label><Textarea rows={2} value={prayerRequest} onChange={e => setPrayerRequest(e.target.value)} /></div>
+                <div><Label>Notes</Label><Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
+              </div>
+            </details>
             {editingId && (
               <div><Label>Status</Label>
                 <select value={status} onChange={e => setStatus(e.target.value)} className="w-full border rounded px-3 py-2">
