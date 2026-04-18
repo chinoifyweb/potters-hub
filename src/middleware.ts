@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const ADMIN_HOSTNAMES = ["admin.tphc.org.ng", "admin.localhost:3000"];
+const ADMIN_HOSTNAMES: string[] = [];
 
 export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
@@ -77,10 +77,27 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/events") ||
     pathname.startsWith("/give") ||
     pathname.startsWith("/blog") ||
+    pathname.startsWith("/children") ||
+    pathname.startsWith("/workers") ||
+    pathname.startsWith("/privacy") ||
+    pathname.startsWith("/terms") ||
+    pathname.startsWith("/about") ||
+    pathname.startsWith("/contact") ||
     pathname.startsWith("/about") ||
     pathname.startsWith("/contact") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/devotionals") ||
+    pathname.startsWith("/api/children-sermons") ||
+    pathname.startsWith("/api/workers-meetings") ||
+    pathname.startsWith("/api/sermons") ||
+    pathname.startsWith("/api/events") ||
+    pathname.startsWith("/api/blog") ||
+    pathname.startsWith("/api/donations") ||
+    pathname.startsWith("/api/bible") ||
+    pathname.startsWith("/api/groups") ||
+    pathname.startsWith("/api/posts") ||
+    pathname.startsWith("/api/children") ||
+
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/debug") ||
     pathname.startsWith("/_next") ||
@@ -119,10 +136,7 @@ export async function middleware(request: NextRequest) {
     if (token) {
       const role = token.role as string;
       if (role === "admin" || role === "pastor") {
-        // Redirect admins to admin subdomain
-        const adminUrl = new URL("/", request.url);
-        adminUrl.hostname = "admin.tphc.org.ng";
-        return NextResponse.redirect(adminUrl);
+        return NextResponse.redirect(new URL("/admin", request.url));
       }
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
@@ -131,6 +145,10 @@ export async function middleware(request: NextRequest) {
 
   // Protected routes - require authentication
   if (!token) {
+    // For API routes, return JSON 401 so the frontend doesn't try to parse HTML
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -141,10 +159,7 @@ export async function middleware(request: NextRequest) {
     if (token.role !== "admin" && token.role !== "pastor") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    // Redirect to admin subdomain
-    const adminUrl = new URL(pathname.replace("/admin", "/") || "/", request.url);
-    adminUrl.hostname = "admin.tphc.org.ng";
-    return NextResponse.redirect(adminUrl);
+    return NextResponse.next();
   }
 
   // API admin routes
