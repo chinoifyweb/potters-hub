@@ -65,6 +65,7 @@ const sidebarNavItems = [
   { title: "Gallery", href: "/admin/gallery", icon: Image },
   { title: "Community", href: "/admin/community", icon: MessageSquare },
   { title: "Communications", href: "/admin/communications", icon: Send },
+  { title: "Outreach", href: "/admin/outreach", icon: Send },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
