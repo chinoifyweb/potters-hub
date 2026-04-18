@@ -53,7 +53,7 @@ export async function smsStatus() {
   };
 }
 
-export async function sendWhatsApp(phone: string, message: string, meta: any = {}) {
+export async function sendWhatsApp(phone: string, message: string, meta: any = {}, files?: string[]) {
   const normalized = normalizeNg(phone);
   let status: string = "sent";
   let error: string | null = null;
@@ -68,8 +68,9 @@ export async function sendWhatsApp(phone: string, message: string, meta: any = {
         name: meta.name,
         type: meta.type,
         message,
+        files,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(120000),
     });
     const data: any = await r.json().catch(() => ({}));
     if (!r.ok || data.error) {

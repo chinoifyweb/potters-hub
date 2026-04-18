@@ -9,7 +9,7 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const axios = require("axios");
 
@@ -256,7 +256,7 @@ app.post("/api/preview", (req, res) => {
 
 // Single WhatsApp message
 app.post("/api/send", async (req, res) => {
-  const { phone, name, type, message } = req.body || {};
+  const { phone, name, type, message, files } = req.body || {};
   if (!phone) {
     return res.status(400).json({ error: "Phone is required" });
   }
@@ -272,14 +272,32 @@ app.post("/api/send", async (req, res) => {
   const text = renderTemplate(type || "custom", name, message);
   try {
     await waClient.sendMessage(waId, text);
+    // Send attachments if any
+    let filesSent = 0;
+    let filesFailed = 0;
+    if (Array.isArray(files) && files.length > 0) {
+      for (const fp of files) {
+        try {
+          const media = MessageMedia.fromFilePath(fp);
+          await waClient.sendMessage(waId, media);
+          filesSent++;
+        } catch (e) {
+          filesFailed++;
+          console.error("[WA] media send failed:", fp, e.message);
+        }
+      }
+    }
     pushLog({
       channel: "whatsapp",
       status: "success",
       to: waId,
       name: name || "",
       type: type || "custom",
+      files: Array.isArray(files) ? files.length : 0,
+      filesSent,
+      filesFailed,
     });
-    res.json({ success: true, to: waId });
+    res.json({ success: true, to: waId, filesSent, filesFailed });
   } catch (err) {
     pushLog({
       channel: "whatsapp",
@@ -327,7 +345,7 @@ app.post("/api/sms", async (req, res) => {
 
 // Bulk WhatsApp broadcast
 app.post("/api/broadcast", async (req, res) => {
-  const { recipients, type, message } = req.body || {};
+  const { recipients, type, message, files } = req.body || {};
   if (!Array.isArray(recipients) || recipients.length === 0) {
     return res.status(400).json({ error: "recipients array required" });
   }
@@ -362,6 +380,17 @@ app.post("/api/broadcast", async (req, res) => {
     const text = renderTemplate(type || "broadcast", r.name, message);
     try {
       await waClient.sendMessage(waId, text);
+      // Send attachments per recipient
+      if (Array.isArray(files) && files.length > 0) {
+        for (const fp of files) {
+          try {
+            const media = MessageMedia.fromFilePath(fp);
+            await waClient.sendMessage(waId, media);
+          } catch (e) {
+            console.error("[WA] media send failed:", fp, e.message);
+          }
+        }
+      }
       sent++;
       pushLog({
         channel: "whatsapp",
@@ -369,6 +398,7 @@ app.post("/api/broadcast", async (req, res) => {
         to: waId,
         name: r.name || "",
         type: type || "broadcast",
+        files: Array.isArray(files) ? files.length : 0,
       });
     } catch (err) {
       failed++;

@@ -66,6 +66,23 @@ export default function OutreachPage() {
   const [search, setSearch] = useState("");
   const [pickerSelectedKeys, setPickerSelectedKeys] = useState<Set<string>>(new Set());
 
+  // Attachments (WhatsApp only)
+  const [files, setFiles] = useState<File[]>([]);
+  function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = e.target.files ? Array.from(e.target.files) : [];
+    const tooBig = list.filter((f) => f.size > 50 * 1024 * 1024);
+    if (tooBig.length > 0) {
+      toast.error(`Skipped ${tooBig.length} file(s) over 50MB: ${tooBig.map((f) => f.name).join(", ")}`);
+    }
+    const under = list.filter((f) => f.size <= 50 * 1024 * 1024);
+    const combined = [...files, ...under].slice(0, 10);
+    setFiles(combined);
+    e.target.value = ""; // allow re-selecting same file
+  }
+  function removeFile(i: number) {
+    setFiles(files.filter((_, idx) => idx !== i));
+  }
+
   async function loadStatus() {
     try {
       const waRes = await fetch("/api/admin/whatsapp");
@@ -215,16 +232,27 @@ export default function OutreachPage() {
     }
     setSending(true);
     try {
-      const r = await fetch("/api/admin/outreach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel,
-          type,
-          customBody,
-          recipients: selected.map((c) => ({ name: c.fullName, phone: c.phone })),
-        }),
-      });
+      const payload = {
+        channel,
+        type,
+        customBody,
+        recipients: selected.map((c) => ({ name: c.fullName, phone: c.phone })),
+      };
+      const useMultipart =
+        files.length > 0 && (channel === "whatsapp" || channel === "both");
+      let r: Response;
+      if (useMultipart) {
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify(payload));
+        for (const f of files) fd.append("files", f);
+        r = await fetch("/api/admin/outreach", { method: "POST", body: fd });
+      } else {
+        r = await fetch("/api/admin/outreach", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
       const data = await r.json();
       const results = data.results || [];
 
@@ -260,6 +288,7 @@ export default function OutreachPage() {
       }
 
       loadLogs();
+      setFiles([]);
     } catch {
       toast.error("Send failed");
     } finally {
@@ -397,6 +426,49 @@ export default function OutreachPage() {
               value={customBody}
               onChange={(e) => setCustomBody(e.target.value)}
             />
+          </div>
+
+          {/* Attachments (WhatsApp only) */}
+          <div>
+            <Label>Attachments (WhatsApp only, up to 10 files, 50MB each)</Label>
+            <Input
+              type="file"
+              multiple
+              accept="image/*,application/pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.mp4,.txt"
+              onChange={addFiles}
+              className="mt-1"
+              disabled={files.length >= 10}
+            />
+            {channel === "sms" && files.length > 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                SMS channel selected — attachments will be ignored.
+              </p>
+            )}
+            {files.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {files.map((f, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-xs bg-muted px-2 py-1 rounded"
+                  >
+                    <span className="truncate">
+                      {f.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({(f.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={() => removeFile(i)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Audience selector */}
