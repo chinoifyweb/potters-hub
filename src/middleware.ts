@@ -97,6 +97,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/groups") ||
     pathname.startsWith("/api/posts") ||
     pathname.startsWith("/api/children") ||
+    pathname.startsWith("/api/files/") ||
+    pathname.startsWith("/download") ||
+    pathname.startsWith("/d/") ||
 
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/debug") ||

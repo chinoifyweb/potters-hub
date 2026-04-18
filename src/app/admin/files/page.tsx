@@ -199,7 +199,7 @@ export default function AdminFilesPage() {
   async function copyLink(row: FileRow) {
     const full =
       (typeof window !== "undefined" ? window.location.origin : "https://tphc.org.ng") +
-      row.url;
+      '/download/' + row.uuid;
     try {
       await navigator.clipboard.writeText(full);
       setCopiedId(row.id);
