@@ -19,6 +19,7 @@ interface M {
   avatarUrl?: string | null;
   role: string;
   phone?: string | null;
+  address?: string | null;
   isVerified: boolean;
   isActive: boolean;
   createdAt: string;
@@ -35,6 +36,7 @@ export default function Page() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [birthDay, setBirthDay] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [role, setRole] = useState("member");
@@ -71,13 +73,25 @@ export default function Page() {
   };
 
   function reset() {
-    setFullName(""); setEmail(""); setBirthDay(""); setBirthMonth(""); setPhone(""); setRole("member"); setIsWorker(false); setWorkerDepartment(""); setEditingId(null);
+    setFullName(""); setEmail(""); setBirthDay(""); setBirthMonth(""); setPhone(""); setRole("member"); setIsWorker(false); setWorkerDepartment(""); setAddress(""); setEditingId(null);
   }
   function openNew() { reset(); setOpen(true); }
   function openEdit(m: M) {
     setEditingId(m.id);
     setFullName(m.fullName); setEmail(m.email);
-    setPhone(m.phone || ""); setBirthDay(String((m as any).birthDay || "")); setBirthMonth(String((m as any).birthMonth || "")); setRole(m.role);
+    setPhone(m.phone || ""); setBirthDay(String((m as any).birthDay || "")); setBirthMonth(String((m as any).birthMonth || "")); setRole(m.role); setAddress((m as any).address || "");
+    setIsWorker(false); setWorkerDepartment("");
+    if (m.phone) {
+      fetch("/api/admin/contacts?audience=all").then((r) => r.json()).then((d) => {
+        const normalize = (p: string) => (p || "").replace(/\D/g, "");
+        const mp = normalize(m.phone || "");
+        const match = (d.contacts || []).find((c: any) => normalize(c.phone) === mp);
+        if (match?.tags?.includes("worker")) {
+          setIsWorker(true);
+          if (match.department) setWorkerDepartment(match.department);
+        }
+      }).catch(() => {});
+    }
     setOpen(true);
   }
 
@@ -91,13 +105,13 @@ export default function Page() {
         r = await fetch(`/api/admin/members/${editingId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null, isWorker, workerDepartment: workerDepartment || null }),
+          body: JSON.stringify({ fullName, email, phone, address, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null, isWorker, workerDepartment: workerDepartment || null }),
         });
       } else {
         r = await fetch("/api/admin/members", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null }),
+          body: JSON.stringify({ fullName, email, phone, address, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null, isWorker, workerDepartment: workerDepartment || null }),
         });
       }
       if (!r.ok) {
@@ -158,10 +172,9 @@ export default function Page() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Member</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Address</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Verified</TableHead>
                   <TableHead>Active</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead></TableHead>
@@ -170,7 +183,7 @@ export default function Page() {
               <TableBody>
                 {members.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />No members found
                     </TableCell>
                   </TableRow>
@@ -186,10 +199,9 @@ export default function Page() {
                           <span className="font-medium">{m.fullName}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{m.email}</TableCell>
                       <TableCell>{m.phone || "—"}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground" title={m.address || ""}>{m.address || "—"}</TableCell>
                       <TableCell><Badge variant={roleVariant(m.role)}>{m.role}</Badge></TableCell>
-                      <TableCell>{m.isVerified ? <Badge variant="default">Yes</Badge> : <Badge variant="secondary">No</Badge>}</TableCell>
                       <TableCell><Switch checked={m.isActive} onCheckedChange={() => toggleActive(m)} /></TableCell>
                       <TableCell>{new Date(m.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right">
@@ -212,6 +224,7 @@ export default function Page() {
             <div><Label>Full Name *</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
             <div><Label>Email (optional)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div><Label>WhatsApp / Phone *</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" required /></div>
+            <div><Label>Address (optional)</Label><textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} className="w-full border rounded px-3 py-2 text-sm" placeholder="Street, city, state" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Birth Day (optional)</Label>
@@ -240,7 +253,7 @@ export default function Page() {
                 <option value="admin">Admin</option>
               </select>
             </div>
-            {!editingId && (
+            {(
               <div className="pt-2 border-t">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input

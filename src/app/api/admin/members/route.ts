@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
           avatarUrl: true,
           role: true,
           phone: true,
+          address: true,
           isVerified: true,
           isActive: true,
           createdAt: true,
@@ -148,8 +149,9 @@ export async function POST(req: NextRequest) {
       isVerified: false,
       birthDay: typeof b.birthDay === "number" ? b.birthDay : null,
       birthMonth: typeof b.birthMonth === "number" ? b.birthMonth : null,
+      address: b.address || null,
     },
-    select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, isVerified: true, createdAt: true },
+    select: { id: true, email: true, fullName: true, phone: true, address: true, role: true, isActive: true, isVerified: true, createdAt: true },
   });
 
   // Also register as worker if requested
