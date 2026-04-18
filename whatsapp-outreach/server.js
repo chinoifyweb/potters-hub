@@ -477,3 +477,30 @@ server.listen(PORT, () => {
   console.log("============================================================");
   console.log("");
 });
+
+// ============================================================
+// LOGOUT / DISCONNECT
+// ============================================================
+app.post('/api/logout', async (req, res) => {
+  try {
+    whatsappStatus.ready = false;
+    whatsappStatus.qr = null;
+    whatsappStatus.state = 'LOGGING_OUT';
+    whatsappStatus.info = null;
+    io.emit('status', whatsappStatus);
+    try { await waClient.logout(); } catch (e) { console.log('[WA] logout error:', e.message); }
+    try { await waClient.destroy(); } catch (e) { console.log('[WA] destroy error:', e.message); }
+    // Wipe session directory so next start requests fresh QR
+    const fs = require('fs');
+    const path = require('path');
+    try { fs.rmSync(path.resolve('./.wa-session'), { recursive: true, force: true }); } catch (e) {}
+    res.json({ ok: true, message: 'Logged out — rescan QR to link a different account' });
+    // Re-init so a new QR is generated
+    setTimeout(() => {
+      whatsappStatus.state = 'INITIALIZING';
+      waClient.initialize().catch((err) => console.error('[WA] Re-init error:', err.message));
+    }, 1500);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});

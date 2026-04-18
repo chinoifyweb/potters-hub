@@ -141,6 +141,8 @@ export async function POST(req: NextRequest) {
       role: b.role || "member",
       isActive: true,
       isVerified: false,
+      birthDay: typeof b.birthDay === "number" ? b.birthDay : null,
+      birthMonth: typeof b.birthMonth === "number" ? b.birthMonth : null,
     },
     select: { id: true, email: true, fullName: true, phone: true, role: true, isActive: true, isVerified: true, createdAt: true },
   });

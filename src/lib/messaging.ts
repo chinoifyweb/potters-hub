@@ -198,7 +198,7 @@ export function renderTemplate(template: string, vars: Record<string, string> = 
   return out;
 }
 
-const CHURCH = "The Potter's Hub";
+const CHURCH = "The Potter's House Church";
 const PASTOR_SIGN = `— Pastor Arthur Ifeanyi & the ${CHURCH} family`;
 const SIGN = `— ${CHURCH} family`;
 

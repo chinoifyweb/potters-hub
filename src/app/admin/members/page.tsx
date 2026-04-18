@@ -35,6 +35,8 @@ export default function Page() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
   const [role, setRole] = useState("member");
 
   const load = async () => {
@@ -67,19 +69,19 @@ export default function Page() {
   };
 
   function reset() {
-    setFullName(""); setEmail(""); setPhone(""); setRole("member"); setEditingId(null);
+    setFullName(""); setEmail(""); setBirthDay(""); setBirthMonth(""); setPhone(""); setRole("member"); setEditingId(null);
   }
   function openNew() { reset(); setOpen(true); }
   function openEdit(m: M) {
     setEditingId(m.id);
     setFullName(m.fullName); setEmail(m.email);
-    setPhone(m.phone || ""); setRole(m.role);
+    setPhone(m.phone || ""); setBirthDay(String((m as any).birthDay || "")); setBirthMonth(String((m as any).birthMonth || "")); setRole(m.role);
     setOpen(true);
   }
 
   async function save() {
     if (!fullName.trim()) { toast.error("Name required"); return; }
-    if (!email.trim()) { toast.error("Email required"); return; }
+    if (!phone.trim()) { toast.error("Phone/WhatsApp number required"); return; }
     setSaving(true);
     try {
       let r: Response;
@@ -87,13 +89,13 @@ export default function Page() {
         r = await fetch(`/api/admin/members/${editingId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email, phone, role }),
+          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null }),
         });
       } else {
         r = await fetch("/api/admin/members", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email, phone, role }),
+          body: JSON.stringify({ fullName, email, phone, role, birthDay: birthDay ? parseInt(birthDay) : null, birthMonth: birthMonth ? parseInt(birthMonth) : null }),
         });
       }
       if (!r.ok) {
@@ -206,8 +208,28 @@ export default function Page() {
           <DialogHeader><DialogTitle>{editingId ? "Edit Member" : "Add Member"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Full Name *</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-            <div><Label>Email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" /></div>
+            <div><Label>Email (optional)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div><Label>WhatsApp / Phone *</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Birth Day (optional)</Label>
+                <select value={birthDay} onChange={(e) => setBirthDay(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
+                  <option value="">—</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Birth Month (optional)</Label>
+                <select value={birthMonth} onChange={(e) => setBirthMonth(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
+                  <option value="">—</option>
+                  {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div>
               <Label>Role</Label>
               <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full border rounded px-3 py-2">

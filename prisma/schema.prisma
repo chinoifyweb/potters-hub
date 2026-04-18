@@ -127,6 +127,8 @@ model User {
   createdMemberLists MemberList[]
 
   @@map("users")
+  birthDay   Int?     @map("birth_day")
+  birthMonth Int?     @map("birth_month")
 }
 
 model Account {
@@ -802,6 +804,8 @@ model Visitor {
   @@index([status])
   @@index([firstVisitDate])
   @@map("visitors")
+  birthDay   Int?     @map("birth_day")
+  birthMonth Int?     @map("birth_month")
 }
 
 model Worker {
@@ -820,6 +824,8 @@ model Worker {
   @@index([phone])
   @@index([department])
   @@map("workers")
+  birthDay   Int?     @map("birth_day")
+  birthMonth Int?     @map("birth_month")
 }
 
 

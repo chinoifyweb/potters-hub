@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Send, Smartphone, MessageCircle, Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
+import { Send, Smartphone, MessageCircle, Loader2, Plus, Trash2, RefreshCw , LogOut} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,19 @@ export default function OutreachPage() {
       if (r.templates?.[type] && !customBody) setCustomBody(r.templates[type]);
     } catch {}
   }
+  async function disconnectWA() {
+    if (!confirm("Disconnect WhatsApp? You will need to scan the QR again to link a different account.")) return;
+    try {
+      const r = await fetch("/api/admin/whatsapp/logout", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Logout failed");
+      toast.success("WhatsApp disconnected — a new QR will appear shortly");
+      setTimeout(loadStatus, 2000);
+    } catch (e: any) {
+      toast.error("Disconnect failed: " + e.message);
+    }
+  }
+
   useEffect(() => {
     loadStatus();
     loadLogs();
