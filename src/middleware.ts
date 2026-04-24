@@ -84,6 +84,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/give") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/children") ||
+    pathname.startsWith("/intercessory") ||
     pathname.startsWith("/workers") ||
     pathname.startsWith("/privacy") ||
     pathname.startsWith("/terms") ||
@@ -94,6 +95,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/devotionals") ||
     pathname.startsWith("/api/children-sermons") ||
+    pathname.startsWith("/api/intercessory") ||
     pathname.startsWith("/api/workers-meetings") ||
     pathname.startsWith("/api/sermons") ||
     pathname.startsWith("/api/events") ||

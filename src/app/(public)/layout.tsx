@@ -24,9 +24,11 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/sermons", label: "Sermons" },
   { href: "/devotionals", label: "Devotionals" },
+  { href: "/children", label: "Children Manual" },
+  { href: "/workers", label: "Workers Manual" },
+  { href: "/intercessory", label: "Intercessory" },
   { href: "/events", label: "Events" },
   { href: "/give", label: "Give" },
-  { href: "/blog", label: "Blog" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
@@ -35,7 +37,6 @@ function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
-  const isPastor = session?.user?.role === "pastor" || session?.user?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -43,11 +44,14 @@ function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <ChurchLogoIcon size={36} />
-          <span className="text-xl font-bold text-foreground">Potter&apos;s Hub</span>
+          <div className="flex flex-col">
+            <span className="text-xl font-bold text-foreground leading-tight">Potter&apos;s Hub</span>
+            <span className="text-[9px] text-muted-foreground leading-none tracking-wide">Transforming Lives, Remolding Destinies</span>
+          </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -62,24 +66,22 @@ function Navbar() {
               {link.label}
             </Link>
           ))}
-          {isPastor && (
-            <Link
-              href="/pastors"
-              className={cn(
-                "px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1",
-                pathname === "/pastors"
-                  ? "text-amber-700 bg-amber-50"
-                  : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-              )}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              Pastor&apos;s Portal
-            </Link>
-          )}
+          <Link
+            href="/pastors"
+            className={cn(
+              "px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1",
+              pathname?.startsWith("/pastors")
+                ? "text-amber-700 bg-amber-50"
+                : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            )}
+          >
+            <Shield className="h-3.5 w-3.5" />
+            Pastor&apos;s Portal
+          </Link>
         </nav>
 
         {/* Desktop Auth Buttons */}
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           {session ? (
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard">Dashboard</Link>
@@ -98,7 +100,7 @@ function Navbar() {
 
         {/* Mobile Menu Toggle */}
         <button
-          className="md:hidden p-2 text-muted-foreground hover:text-foreground"
+          className="lg:hidden p-2 text-muted-foreground hover:text-foreground"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
           {mobileMenuOpen ? (
@@ -111,7 +113,7 @@ function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t bg-white">
+        <div className="lg:hidden border-t bg-white">
           <nav className="flex flex-col p-4 space-y-1">
             {navLinks.map((link) => (
               <Link
@@ -128,21 +130,19 @@ function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {isPastor && (
-              <Link
-                href="/pastors"
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "px-3 py-2.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2",
-                  pathname === "/pastors"
-                    ? "text-amber-700 bg-amber-50"
-                    : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                )}
-              >
-                <Shield className="h-4 w-4" />
-                Pastor&apos;s Portal
-              </Link>
-            )}
+            <Link
+              href="/pastors"
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn(
+                "px-3 py-2.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2",
+                pathname?.startsWith("/pastors")
+                  ? "text-amber-700 bg-amber-50"
+                  : "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+              )}
+            >
+              <Shield className="h-4 w-4" />
+              Pastor&apos;s Portal
+            </Link>
             <div className="pt-3 border-t mt-2 flex flex-col gap-2">
               {session ? (
                 <Button variant="outline" asChild>
@@ -183,8 +183,11 @@ function Footer() {
               <ChurchLogoIcon size={36} />
               <span className="text-xl font-bold text-white">Potter&apos;s Hub</span>
             </div>
+            <p className="text-sm leading-relaxed italic">
+              Transforming Lives, Remolding Destinies.
+            </p>
             <p className="text-sm leading-relaxed">
-              Transforming Lives, Remolding Destinies. A community of believers growing together in faith, hope, and love.
+              A community of believers growing together in faith, hope, and love.
             </p>
             <div className="flex gap-3">
               <a
@@ -271,7 +274,7 @@ function Footer() {
         </div>
 
         <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
-          <p>&copy; {new Date().getFullYear()} Potter&apos;s Hub. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Potter&apos;s Hub — The Potter&apos;s House Church. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/terms" className="hover:text-white transition-colors">
               Terms of Service

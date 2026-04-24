@@ -62,6 +62,7 @@ const sidebarNavItems = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Members", href: "/admin/members", icon: Users },
   { title: "Workers", href: "/admin/workers", icon: HardHat },
+  { title: "Intercessory", href: "/intercessory", icon: Heart },
   { title: "FirstTimers", href: "/admin/visitors", icon: UserPlus },
   { title: "Sermons", href: "/admin/sermons", icon: Video },
   { title: "Pastor Messages", href: "/admin/pastor-messages", icon: Shield },

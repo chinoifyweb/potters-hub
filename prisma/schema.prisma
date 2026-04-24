@@ -996,6 +996,23 @@ model WorkersMeeting {
   @@map("workers_meetings")
 }
 
+model IntercessoryPrayerSet {
+  id           String   @id @default(uuid())
+  weekNumber   Int      @map("week_number")
+  fridayDate   DateTime @map("friday_date")
+  title        String
+  intro        String?  @db.Text
+  prayerPoints Json     @map("prayer_points")
+  isPublished  Boolean  @default(true) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([fridayDate])
+  @@index([weekNumber])
+  @@map("intercessory_prayer_sets")
+}
+
+
 // ============================================
 // AUTH: PASSWORD RESET
 // ============================================
