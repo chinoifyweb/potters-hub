@@ -27,6 +27,7 @@ const navLinks = [
   { href: "/children", label: "Children Manual" },
   { href: "/workers", label: "Workers Manual" },
   { href: "/intercessory", label: "Intercessory" },
+  { href: "/sunday-service", label: "Sunday Service" },
   { href: "/events", label: "Events" },
   { href: "/give", label: "Give" },
   { href: "/about", label: "About" },

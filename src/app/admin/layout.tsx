@@ -28,6 +28,7 @@ import {
   CalendarDays,
   BookMarked,
   HardHat,
+  HeartHandshake,
   FolderUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -63,6 +64,7 @@ const sidebarNavItems = [
   { title: "Members", href: "/admin/members", icon: Users },
   { title: "Workers", href: "/admin/workers", icon: HardHat },
   { title: "Intercessory", href: "/intercessory", icon: Heart },
+  { title: "Sunday Service", href: "/sunday-service", icon: HeartHandshake },
   { title: "FirstTimers", href: "/admin/visitors", icon: UserPlus },
   { title: "Sermons", href: "/admin/sermons", icon: Video },
   { title: "Pastor Messages", href: "/admin/pastor-messages", icon: Shield },

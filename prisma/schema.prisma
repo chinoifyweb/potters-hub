@@ -1012,6 +1012,23 @@ model IntercessoryPrayerSet {
   @@map("intercessory_prayer_sets")
 }
 
+model SundayService {
+  id          String   @id @default(uuid())
+  weekNumber  Int      @map("week_number")
+  sundayDate  DateTime @map("sunday_date")
+  publishAt   DateTime @map("publish_at")
+  title       String
+  intro       String?  @db.Text
+  sections    Json     @map("sections")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([publishAt])
+  @@index([sundayDate])
+  @@map("sunday_services")
+}
+
 
 // ============================================
 // AUTH: PASSWORD RESET
