@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import {
   ThumbsUp,
   MessageSquare,
@@ -8,136 +8,135 @@ import {
   ImageIcon,
   ChevronDown,
   ChevronUp,
+  Loader2,
+  Info,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-interface Comment {
+// ---------------------------------------------------------------------------
+// Types matching the /api/posts response
+// ---------------------------------------------------------------------------
+
+type ApiUser = {
   id: string
-  author: string
-  initials: string
-  avatar?: string
-  text: string
-  time: string
+  fullName: string | null
+  avatarUrl: string | null
 }
 
-interface Post {
+type ApiPost = {
   id: string
-  author: string
-  avatar?: string
-  initials: string
+  userId: string
   content: string
-  type: "General" | "Prayer Request" | "Testimony" | "Announcement"
-  likes: number
-  liked: boolean
-  comments: Comment[]
-  time: string
-  image?: string
+  postType: "general" | "prayer_request" | "testimony" | "announcement"
+  mediaUrls: string[] | null
+  isPinned: boolean
+  isVisible: boolean
+  createdAt: string
+  updatedAt: string
+  user: ApiUser
+  _count?: { comments: number; likes: number }
 }
 
-const initialPosts: Post[] = [
-  {
-    id: "1",
-    author: "Sarah Adeyemi",
-    initials: "SA",
-    content: "God has been so faithful! I got the job I've been praying about for months. After 6 months of trusting God, He came through! Please join me in praising God for His goodness!",
-    type: "Testimony",
-    likes: 24,
-    liked: false,
-    time: "2h ago",
-    comments: [
-      { id: "c1", author: "Grace Eze", initials: "GE", text: "Praise God! He is always faithful!", time: "1h ago" },
-      { id: "c2", author: "Paul Mensah", initials: "PM", text: "Congratulations! God is good all the time!", time: "45m ago" },
-    ],
-  },
-  {
-    id: "2",
-    author: "Brother Michael",
-    initials: "BM",
-    content: "Please keep my family in your prayers as we go through a challenging season. My mother is in the hospital and we're believing God for a complete healing. God is able!",
-    type: "Prayer Request",
-    likes: 31,
-    liked: true,
-    time: "5h ago",
-    comments: [
-      { id: "c3", author: "Ruth Adebayo", initials: "RA", text: "Praying for your mother, Brother Michael. God is the great physician.", time: "4h ago" },
-      { id: "c4", author: "John Doe", initials: "JD", text: "Standing with you in prayer. Isaiah 53:5.", time: "3h ago" },
-      { id: "c5", author: "Mary Taiwo", initials: "MT", text: "The Lord will perfect everything concerning your mother. Amen.", time: "2h ago" },
-    ],
-  },
-  {
-    id: "3",
-    author: "Pastor James Okonkwo",
-    initials: "JO",
-    content: "Reminder: Our annual church picnic is coming up on March 29th! Bring your family and friends for a wonderful time of fellowship, food, and fun. Don't forget to register at the church office.",
-    type: "Announcement",
-    likes: 45,
-    liked: false,
-    time: "8h ago",
-    comments: [
-      { id: "c6", author: "Kemi Adeyinka", initials: "KA", text: "Can't wait! Already registered my family.", time: "7h ago" },
-    ],
-  },
-  {
-    id: "4",
-    author: "Tunde Bakare",
-    initials: "TB",
-    content: "Today's morning devotion really blessed me. The scripture reading from Psalm 23 reminded me that even in the valley, God is with us. He is our shepherd and we shall not want.",
-    type: "General",
-    likes: 18,
-    liked: false,
-    time: "12h ago",
-    comments: [],
-  },
-  {
-    id: "5",
-    author: "Sister Ngozi Okonkwo",
-    initials: "NO",
-    content: "I want to testify about God's faithfulness in my children's education. Both of them got scholarships to study abroad! Only God can do this! All glory to His name!",
-    type: "Testimony",
-    likes: 52,
-    liked: true,
-    time: "1d ago",
-    comments: [
-      { id: "c7", author: "Ada Nweke", initials: "AN", text: "What an amazing testimony! Our God is able!", time: "23h ago" },
-    ],
-  },
-]
+const postTypes = ["general", "prayer_request", "testimony", "announcement"] as const
+type PostType = typeof postTypes[number]
 
-const postTypes = ["General", "Prayer Request", "Testimony", "Announcement"] as const
-const tabs = ["All", "Prayer Requests", "Testimonies", "Announcements"]
+const tabs = ["All", "Prayer Requests", "Testimonies", "Announcements"] as const
 
-const typeColors: Record<string, string> = {
-  "General": "bg-gray-100 text-gray-700",
-  "Prayer Request": "bg-purple-100 text-purple-700",
-  "Testimony": "bg-green-100 text-green-700",
-  "Announcement": "bg-red-100 text-red-700",
+// ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
+
+const typeLabel: Record<PostType, string> = {
+  general: "General",
+  prayer_request: "Prayer Request",
+  testimony: "Testimony",
+  announcement: "Announcement",
 }
+
+const typeColors: Record<PostType, string> = {
+  general: "bg-gray-100 text-gray-700",
+  prayer_request: "bg-purple-100 text-purple-700",
+  testimony: "bg-green-100 text-green-700",
+  announcement: "bg-red-100 text-red-700",
+}
+
+function initialsFromName(name: string | null | undefined): string {
+  if (!name) return "U"
+  const parts = name.trim().split(/\s+/).slice(0, 2)
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "U"
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ""
+  const diffMs = Date.now() - then
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 1) return "Just now"
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function CommunityPage() {
-  const [posts, setPosts] = useState(initialPosts)
+  const [posts, setPosts] = useState<ApiPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const [newPostContent, setNewPostContent] = useState("")
-  const [newPostType, setNewPostType] = useState<typeof postTypes[number]>("General")
+  const [newPostType, setNewPostType] = useState<PostType>("general")
   const [expandedComments, setExpandedComments] = useState<string[]>([])
-  const [commentText, setCommentText] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState("All")
+  const [activeTab, setActiveTab] = useState<typeof tabs[number]>("All")
+
+  // Local optimistic likes (the like API isn't wired yet — keep client-only state).
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({})
+  const [likeDeltas, setLikeDeltas] = useState<Record<string, number>>({})
+
+  const loadPosts = async () => {
+    try {
+      const res = await fetch("/api/posts", { cache: "no-store" })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Failed to load posts (${res.status})`)
+      }
+      const json = await res.json()
+      setPosts(json.posts ?? [])
+      setError(null)
+    } catch (e: any) {
+      console.error("Failed to load posts:", e)
+      setError(e?.message || "Failed to load posts")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPosts()
+  }, [])
 
   const toggleLike = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
-    )
+    setLikedPosts((prev) => {
+      const isLiked = !!prev[postId]
+      const next = { ...prev, [postId]: !isLiked }
+      setLikeDeltas((d) => ({ ...d, [postId]: (d[postId] ?? 0) + (isLiked ? -1 : 1) }))
+      return next
+    })
   }
 
   const toggleComments = (postId: string) => {
@@ -146,55 +145,48 @@ export default function CommunityPage() {
     )
   }
 
-  const addComment = (postId: string) => {
-    const text = commentText[postId]?.trim()
-    if (!text) return
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              comments: [
-                ...p.comments,
-                {
-                  id: `c${Date.now()}`,
-                  author: "John Doe",
-                  initials: "JD",
-                  text,
-                  time: "Just now",
-                },
-              ],
-            }
-          : p
+  const createPost = async () => {
+    const content = newPostContent.trim()
+    if (!content || posting) return
+    setPosting(true)
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, postType: newPostType }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        if (res.status === 401) {
+          toast.error("Please sign in to post.")
+        } else {
+          toast.error(body.error || "Failed to publish post")
+        }
+        return
+      }
+      const created: ApiPost = await res.json()
+      // The API marks new posts visible by default, so they appear immediately.
+      setPosts((prev) => [created, ...prev])
+      setNewPostContent("")
+      setNewPostType("general")
+      toast.success(
+        created.isVisible
+          ? "Post published!"
+          : "Submitted — your post is awaiting moderation."
       )
-    )
-    setCommentText((prev) => ({ ...prev, [postId]: "" }))
-    toast.success("Comment added")
-  }
-
-  const createPost = () => {
-    if (!newPostContent.trim()) return
-    const newPost: Post = {
-      id: `p${Date.now()}`,
-      author: "John Doe",
-      initials: "JD",
-      content: newPostContent,
-      type: newPostType,
-      likes: 0,
-      liked: false,
-      comments: [],
-      time: "Just now",
+    } catch (e: any) {
+      console.error("Failed to create post:", e)
+      toast.error("Failed to publish post")
+    } finally {
+      setPosting(false)
     }
-    setPosts([newPost, ...posts])
-    setNewPostContent("")
-    toast.success("Post published!")
   }
 
   const filteredPosts = posts.filter((p) => {
     if (activeTab === "All") return true
-    if (activeTab === "Prayer Requests") return p.type === "Prayer Request"
-    if (activeTab === "Testimonies") return p.type === "Testimony"
-    if (activeTab === "Announcements") return p.type === "Announcement"
+    if (activeTab === "Prayer Requests") return p.postType === "prayer_request"
+    if (activeTab === "Testimonies") return p.postType === "testimony"
+    if (activeTab === "Announcements") return p.postType === "announcement"
     return true
   })
 
@@ -202,7 +194,9 @@ export default function CommunityPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Community</h2>
-        <p className="text-muted-foreground">Share, encourage, and pray for one another.</p>
+        <p className="text-muted-foreground">
+          Share, encourage, and pray for one another.
+        </p>
       </div>
 
       {/* Create Post */}
@@ -213,6 +207,7 @@ export default function CommunityPage() {
             value={newPostContent}
             onChange={(e) => setNewPostContent(e.target.value)}
             rows={3}
+            disabled={posting}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-1.5">
@@ -223,25 +218,42 @@ export default function CommunityPage() {
                   size="sm"
                   className="text-xs h-7"
                   onClick={() => setNewPostType(type)}
+                  disabled={posting}
                 >
-                  {type}
+                  {typeLabel[type]}
                 </Button>
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
                 <ImageIcon className="h-4 w-4" />
               </Button>
-              <Button size="sm" onClick={createPost} disabled={!newPostContent.trim()}>
-                <Send className="h-4 w-4 mr-1.5" /> Post
+              <Button
+                size="sm"
+                onClick={createPost}
+                disabled={!newPostContent.trim() || posting}
+              >
+                {posting ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-1.5" />
+                )}
+                Post
               </Button>
             </div>
           </div>
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+            <Info className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>
+              Posts are public to the church community. Inappropriate content may be
+              hidden by moderators.
+            </span>
+          </p>
         </CardContent>
       </Card>
 
       {/* Filter Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="w-full sm:w-auto">
           {tabs.map((tab) => (
             <TabsTrigger key={tab} value={tab} className="text-xs">
@@ -253,109 +265,100 @@ export default function CommunityPage() {
 
       {/* Posts Feed */}
       <div className="space-y-4">
-        {filteredPosts.map((post) => {
-          const commentsExpanded = expandedComments.includes(post.id)
-          return (
-            <Card key={post.id}>
-              <CardContent className="p-4 space-y-3">
-                {/* Author Row */}
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={post.avatar} />
-                    <AvatarFallback className="text-xs">{post.initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{post.author}</p>
-                    <p className="text-[11px] text-muted-foreground">{post.time}</p>
-                  </div>
-                  <Badge className={cn("text-[10px]", typeColors[post.type] || "")}>
-                    {post.type}
-                  </Badge>
-                </div>
+        {loading && (
+          <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Loading posts...
+          </div>
+        )}
 
-                {/* Content */}
-                <p className="text-sm leading-relaxed">{post.content}</p>
+        {!loading && error && (
+          <div className="text-center py-12 text-destructive text-sm">{error}</div>
+        )}
 
-                {/* Actions */}
-                <div className="flex items-center gap-4 pt-1">
-                  <button
-                    className={cn(
-                      "flex items-center gap-1.5 text-sm transition-colors",
-                      post.liked ? "text-primary font-medium" : "text-muted-foreground hover:text-primary"
-                    )}
-                    onClick={() => toggleLike(post.id)}
-                  >
-                    <ThumbsUp className={cn("h-4 w-4", post.liked && "fill-current")} />
-                    {post.likes}
-                  </button>
-                  <button
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
-                    onClick={() => toggleComments(post.id)}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    {post.comments.length}
-                    {commentsExpanded ? (
-                      <ChevronUp className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                  </button>
-                </div>
+        {!loading && !error &&
+          filteredPosts.map((post) => {
+            const commentsExpanded = expandedComments.includes(post.id)
+            const baseLikes = post._count?.likes ?? 0
+            const likes = baseLikes + (likeDeltas[post.id] ?? 0)
+            const liked = !!likedPosts[post.id]
+            const author = post.user?.fullName ?? "Member"
+            const initials = initialsFromName(post.user?.fullName)
+            const commentCount = post._count?.comments ?? 0
 
-                {/* Comments Section */}
-                {commentsExpanded && (
-                  <div className="space-y-3 pt-2">
-                    <Separator />
-                    {post.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-2">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage src={comment.avatar} />
-                          <AvatarFallback className="text-[9px]">{comment.initials}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 rounded-lg bg-muted/50 px-3 py-2">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xs font-medium">{comment.author}</span>
-                            <span className="text-[10px] text-muted-foreground">{comment.time}</span>
-                          </div>
-                          <p className="text-sm mt-0.5">{comment.text}</p>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Add Comment */}
-                    <div className="flex gap-2">
-                      <Avatar className="h-7 w-7">
-                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary">JD</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 flex gap-2">
-                        <Input
-                          placeholder="Write a comment..."
-                          value={commentText[post.id] || ""}
-                          onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
-                          className="h-8 text-sm"
-                          onKeyDown={(e) => e.key === "Enter" && addComment(post.id)}
-                        />
-                        <Button
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() => addComment(post.id)}
-                          disabled={!commentText[post.id]?.trim()}
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+            return (
+              <Card key={post.id}>
+                <CardContent className="p-4 space-y-3">
+                  {/* Author Row */}
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={post.user?.avatarUrl ?? undefined} />
+                      <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{author}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {relativeTime(post.createdAt)}
+                      </p>
                     </div>
+                    <Badge className={cn("text-[10px]", typeColors[post.postType])}>
+                      {typeLabel[post.postType]}
+                    </Badge>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          )
-        })}
 
-        {filteredPosts.length === 0 && (
+                  {/* Content */}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-4 pt-1">
+                    <button
+                      className={cn(
+                        "flex items-center gap-1.5 text-sm transition-colors",
+                        liked
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground hover:text-primary"
+                      )}
+                      onClick={() => toggleLike(post.id)}
+                    >
+                      <ThumbsUp className={cn("h-4 w-4", liked && "fill-current")} />
+                      {likes}
+                    </button>
+                    <button
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => toggleComments(post.id)}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {commentCount}
+                      {commentsExpanded ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Comments Section (placeholder until comments API is wired) */}
+                  {commentsExpanded && (
+                    <div className="space-y-3 pt-2">
+                      <Separator />
+                      <p className="text-xs text-muted-foreground italic">
+                        Comments are coming soon.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+
+        {!loading && !error && filteredPosts.length === 0 && (
           <div className="text-center py-12">
             <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground">No posts in this category yet.</p>
+            <p className="text-muted-foreground">
+              No posts in this category yet. Be the first to share!
+            </p>
           </div>
         )}
       </div>
