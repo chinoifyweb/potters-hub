@@ -4,10 +4,31 @@ import { getToken } from "next-auth/jwt";
 
 const ADMIN_HOSTNAMES: string[] = [];
 
+function applyApiCors(res: NextResponse): NextResponse {
+  res.headers.set("Access-Control-Allow-Origin", "*");
+  res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
+  return res;
+}
+
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   const { pathname } = request.nextUrl;
   const hostname = request.headers.get("host") || "";
+
+  // ---------------------------------------------------------------------------
+  // Mobile/CORS preflight — allow OPTIONS through everywhere on /api/*
+  // ---------------------------------------------------------------------------
+  if (request.method === "OPTIONS" && pathname.startsWith("/api/")) {
+    const res = new NextResponse(null, { status: 204 });
+    res.headers.set("Access-Control-Allow-Origin", "*");
+    res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept");
+    res.headers.set("Access-Control-Max-Age", "86400");
+    return res;
+  }
+
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const hasMobileAuth = (request.headers.get("authorization") || request.headers.get("Authorization") || "").startsWith("Bearer ");
 
   const isAdminSubdomain = ADMIN_HOSTNAMES.some((h) => hostname.includes(h.split(":")[0]));
 
@@ -22,7 +43,9 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/api/debug") ||
       pathname.includes(".")
     ) {
-      return NextResponse.next();
+      const res = NextResponse.next();
+      if (pathname.startsWith("/api/")) applyApiCors(res);
+      return res;
     }
 
     // Login/signup pages on admin subdomain
@@ -70,6 +93,7 @@ export async function middleware(request: NextRequest) {
     subRes.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     subRes.headers.set("Pragma", "no-cache");
     subRes.headers.set("Expires", "0");
+    if (pathname.startsWith("/api/")) applyApiCors(subRes);
     return subRes;
   }
 
@@ -94,6 +118,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/about") ||
     pathname.startsWith("/contact") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/mobile/auth/") ||
     pathname.startsWith("/api/devotionals") ||
     pathname.startsWith("/api/children-sermons") ||
     pathname.startsWith("/api/intercessory") ||
@@ -117,7 +142,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    if (pathname.startsWith("/api/")) applyApiCors(res);
+    return res;
   }
 
   // Pastor's Portal - requires pastor or admin role
@@ -135,13 +162,15 @@ export async function middleware(request: NextRequest) {
 
   // Pastor messages API - requires pastor or admin role
   if (pathname.startsWith("/api/pastor-messages")) {
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token && !hasMobileAuth) {
+      return applyApiCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
-    if (token.role !== "pastor" && token.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (token && token.role !== "pastor" && token.role !== "admin") {
+      return applyApiCors(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
     }
-    return NextResponse.next();
+    const res = NextResponse.next();
+    applyApiCors(res);
+    return res;
   }
 
   // Auth pages - redirect to dashboard if already logged in
@@ -157,10 +186,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes - require authentication
-  if (!token) {
+  if (!token && !hasMobileAuth) {
     // For API routes, return JSON 401 so the frontend doesn't try to parse HTML
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return applyApiCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
@@ -169,7 +198,7 @@ export async function middleware(request: NextRequest) {
 
   // Admin routes on main domain - redirect to admin subdomain
   if (pathname.startsWith("/admin")) {
-    if (token.role !== "admin" && token.role !== "pastor") {
+    if (!token || (token.role !== "admin" && token.role !== "pastor")) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     // Defense-in-depth: make sure nothing (LiteSpeed, Cloudflare, browser
@@ -185,12 +214,14 @@ export async function middleware(request: NextRequest) {
 
   // API admin routes
   if (pathname.startsWith("/api/admin")) {
-    if (token.role !== "admin" && token.role !== "pastor") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!token || (token.role !== "admin" && token.role !== "pastor")) {
+      return applyApiCors(NextResponse.json({ error: "Unauthorized" }, { status: 403 }));
     }
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  if (pathname.startsWith("/api/")) applyApiCors(res);
+  return res;
 }
 
 export const config = {
