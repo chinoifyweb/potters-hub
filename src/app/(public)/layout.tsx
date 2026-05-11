@@ -28,6 +28,7 @@ const navLinks = [
   { href: "/workers", label: "Workers Manual" },
   { href: "/intercessory", label: "Intercessory" },
   { href: "/sunday-service", label: "Sunday Service" },
+  { href: "/bible-study", label: "Bible Study" },
   { href: "/events", label: "Events" },
   { href: "/give", label: "Give" },
   { href: "/about", label: "About" },

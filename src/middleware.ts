@@ -110,6 +110,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/children") ||
     pathname.startsWith("/intercessory") ||
     pathname.startsWith("/sunday-service") ||
+    pathname.startsWith("/bible-study") ||
+    pathname.startsWith("/api/bible-study") ||
     pathname.startsWith("/workers") ||
     pathname.startsWith("/privacy") ||
     pathname.startsWith("/terms") ||

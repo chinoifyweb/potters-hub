@@ -126,6 +126,9 @@ model User {
   passwordResetTokens PasswordResetToken[]
   createdMemberLists MemberList[]
   fileUploads        FileUpload[]
+  bibleStudyTopicsCreated BibleStudyTopic[] @relation("BibleStudyTopicCreator")
+  bibleStudyPosts         BibleStudyPost[]  @relation("BibleStudyPostAuthor")
+  bibleStudyLikes         BibleStudyLike[]  @relation("BibleStudyLikes")
 
   @@map("users")
   birthDay   Int?     @map("birth_day")
@@ -1068,4 +1071,65 @@ model FileUpload {
 
   @@index([createdAt])
   @@map("file_uploads")
+}
+
+// ============================================
+// BIBLE STUDY DISCUSSION FORUM
+// ============================================
+
+model BibleStudyTopic {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?  @db.Text
+  scripture    String?  // e.g. "Romans 12:1-2" or "Genesis 1"
+  category     String   @default("general") @map("category")
+  isPinned     Boolean  @default(false) @map("is_pinned")
+  isLocked     Boolean  @default(false) @map("is_locked")
+  isVisible    Boolean  @default(true) @map("is_visible")
+  viewCount    Int      @default(0) @map("view_count")
+  createdById  String   @map("created_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+
+  createdBy User              @relation("BibleStudyTopicCreator", fields: [createdById], references: [id])
+  posts     BibleStudyPost[]
+
+  @@index([category])
+  @@index([isPinned, lastActivityAt(sort: Desc)])
+  @@map("bible_study_topics")
+}
+
+model BibleStudyPost {
+  id           String   @id @default(uuid())
+  topicId      String   @map("topic_id")
+  content      String   @db.Text
+  parentPostId String?  @map("parent_post_id")
+  authorId     String   @map("author_id")
+  isVisible    Boolean  @default(true) @map("is_visible")
+  likeCount    Int      @default(0) @map("like_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  topic      BibleStudyTopic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  parentPost BibleStudyPost?   @relation("Replies", fields: [parentPostId], references: [id], onDelete: SetNull)
+  replies    BibleStudyPost[]  @relation("Replies")
+  author     User              @relation("BibleStudyPostAuthor", fields: [authorId], references: [id])
+  likes      BibleStudyLike[]
+
+  @@index([topicId, createdAt])
+  @@map("bible_study_posts")
+}
+
+model BibleStudyLike {
+  id        String   @id @default(uuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post BibleStudyPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User           @relation("BibleStudyLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("bible_study_likes")
 }

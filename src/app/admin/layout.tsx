@@ -77,6 +77,7 @@ const sidebarNavItems = [
   { title: "Groups", href: "/admin/groups", icon: UsersRound },
   { title: "Donations", href: "/admin/donations", icon: Heart },
   { title: "Devotionals", href: "/admin/devotionals", icon: BookOpen },
+  { title: "Bible Study", href: "/admin/bible-study", icon: BookOpen },
   { title: "Blog", href: "/admin/blog", icon: FileText },
   { title: "Gallery", href: "/admin/gallery", icon: Image },
   { title: "Community", href: "/admin/community", icon: MessageSquare },  { title: "Outreach", href: "/admin/outreach", icon: Phone },
